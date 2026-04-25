@@ -1,13 +1,13 @@
 {
   "domain": "notification_engine",
   "name": "Notification Engine",
-  "version": "0.1.0",
-  "config_flow": true,
-  "documentation": "https://github.com/ygiraud/ha-notification-engine",
-  "issue_tracker": "https://github.com/ygiraud/ha-notification-engine/issues",
   "codeowners": [],
+  "config_flow": true,
   "dependencies": ["lovelace"],
-  "requirements": [],
+  "documentation": "https://github.com/ygiraud/ha-notification-engine",
   "integration_type": "service",
-  "iot_class": "local_push"
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/ygiraud/ha-notification-engine/issues",
+  "requirements": [],
+  "version": "0.1.0"
 }
