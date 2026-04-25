@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Engine",
+        "description": "Configure Notification Engine.",
+        "data": {
+          "people_entities": "People",
+          "away_reminder_mode": "Away reminder mode",
+          "away_reminder_tolerance_m": "Away reminder tolerance (meters)",
+          "away_reminder_max_distance_m": "Away reminder max distance (meters)",
+          "install_dashboard": "Install dashboard in sidebar",
+          "people": "People overrides (advanced)"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "Invalid JSON format for people mapping."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notification Engine options",
+        "description": "Update Notification Engine options.",
+        "data": {
+          "people_entities": "People",
+          "away_reminder_mode": "Away reminder mode",
+          "away_reminder_tolerance_m": "Away reminder tolerance (meters)",
+          "away_reminder_max_distance_m": "Away reminder max distance (meters)",
+          "install_dashboard": "Install dashboard in sidebar",
+          "people": "People overrides (advanced)"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "Invalid JSON format for people mapping."
+    }
+  }
+}

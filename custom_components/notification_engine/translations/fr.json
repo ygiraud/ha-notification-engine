@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Engine",
+        "description": "Configurer Notification Engine.",
+        "data": {
+          "people_entities": "Personnes",
+          "away_reminder_mode": "Mode de rappel d'absence",
+          "away_reminder_tolerance_m": "Tolérance du rappel d'absence (mètres)",
+          "away_reminder_max_distance_m": "Distance maximale du rappel d'absence (mètres)",
+          "install_dashboard": "Installer le dashboard dans la barre latérale",
+          "people": "Surcharges des personnes (avancé)"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "Format JSON invalide pour la configuration des personnes."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options de Notification Engine",
+        "description": "Mettre à jour les options de Notification Engine.",
+        "data": {
+          "people_entities": "Personnes",
+          "away_reminder_mode": "Mode de rappel d'absence",
+          "away_reminder_tolerance_m": "Tolérance du rappel d'absence (mètres)",
+          "away_reminder_max_distance_m": "Distance maximale du rappel d'absence (mètres)",
+          "install_dashboard": "Installer le dashboard dans la barre latérale",
+          "people": "Surcharges des personnes (avancé)"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "Format JSON invalide pour la configuration des personnes."
+    }
+  }
+}

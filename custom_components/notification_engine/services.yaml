@@ -1,0 +1,149 @@
+create_event:
+  name: Create event
+  description: Create a notification event with idempotent deduplication.
+  fields:
+    key:
+      name: Event key
+      description: Functional key used for deduplication and cleanup logic.
+      required: true
+      example: "washing_machine_done"
+      selector:
+        text:
+    strategy:
+      name: Strategy
+      description: Delivery strategy.
+      required: true
+      default: "alert"
+      selector:
+        select:
+          options:
+            - present
+            - asap
+            - away_reminder
+            - alert
+            - info
+    source_entity:
+      name: Source entity
+      description: Optional source entity id.
+      required: false
+      selector:
+        text:
+    context_label:
+      name: Context label
+      description: Optional context label.
+      required: false
+      selector:
+        text:
+    person_entity:
+      name: Person entity
+      description: Optional single person entity.
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      description: Notification title.
+      required: true
+      selector:
+        text:
+    message:
+      name: Message
+      description: Notification body.
+      required: true
+      selector:
+        text:
+    targets:
+      name: Targets
+      description: Person entities.
+      required: false
+      selector:
+        entity:
+          domain: person
+          multiple: true
+    actions:
+      name: Actions
+      description: JSON array with action/title objects.
+      required: false
+      example: '[{"action":"DONE","title":"OK"}]'
+      selector:
+        text:
+
+list_events:
+  name: List events
+  description: Return all events.
+
+send_info:
+  name: Send info
+  description: Send an immediate notification without creating an event.
+  fields:
+    title:
+      name: Title
+      required: true
+      selector:
+        text:
+    message:
+      name: Message
+      required: true
+      selector:
+        text:
+    targets:
+      name: Targets
+      description: Person entities.
+      required: false
+      selector:
+        entity:
+          domain: person
+          multiple: true
+
+process_events:
+  name: Process events
+  description: Process pending events and send notifications according to strategy.
+
+ack_event:
+  name: Ack event
+  description: Update event status (typically done).
+  fields:
+    id:
+      name: Event id
+      required: true
+      selector:
+        text:
+    status:
+      name: Status
+      required: false
+      default: done
+      selector:
+        text:
+
+notify_person:
+  name: Mark person notified
+  description: Mark one person as notified for an event.
+  fields:
+    id:
+      name: Event id
+      required: true
+      selector:
+        text:
+    person:
+      name: Person entity
+      required: true
+      selector:
+        text:
+
+cleanup_events:
+  name: Cleanup events
+  description: Delete all events that are not pending.
+
+delete_event:
+  name: Delete event
+  description: Delete one event by id.
+  fields:
+    id:
+      name: Event id
+      required: true
+      selector:
+        text:
+
+purge_events:
+  name: Purge events
+  description: Delete all events.

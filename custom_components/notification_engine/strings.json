@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "notification_engine",
+        "description": "configure_notification_engine",
+        "data": {
+          "people_entities": "people_entities",
+          "away_reminder_mode": "away_reminder_mode",
+          "away_reminder_tolerance_m": "away_reminder_tolerance_m",
+          "away_reminder_max_distance_m": "away_reminder_max_distance_m",
+          "install_dashboard": "install_dashboard",
+          "people": "people_overrides_advanced"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "invalid_people_json"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "notification_engine_options",
+        "description": "update_notification_engine_options",
+        "data": {
+          "people_entities": "people_entities",
+          "away_reminder_mode": "away_reminder_mode",
+          "away_reminder_tolerance_m": "away_reminder_tolerance_m",
+          "away_reminder_max_distance_m": "away_reminder_max_distance_m",
+          "install_dashboard": "install_dashboard",
+          "people": "people_overrides_advanced"
+        }
+      }
+    },
+    "error": {
+      "invalid_people_json": "invalid_people_json"
+    }
+  }
+}

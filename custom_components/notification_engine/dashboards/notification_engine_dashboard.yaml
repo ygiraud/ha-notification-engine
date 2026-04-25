@@ -1,0 +1,450 @@
+views:
+  - title: Notifications
+    path: notifications
+    icon: ''
+    type: sections
+    max_columns: 2
+    subview: false
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: heading
+                heading: 🚨 Alertes
+                heading_style: title
+              - type: custom:auto-entities
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                card_param: cards
+                filter:
+                  template: >-
+                    {% set events =
+                    state_attr('sensor.notifications_evenements', 'events') |
+                    default([], true) %} {% set filtered = events |
+                    selectattr('strategy', 'equalto', 'alert') | list %}
+
+                    {% if filtered | length == 0 %}
+                      {{
+                        [
+                          {
+                            "type": "custom:mushroom-template-card",
+                            "primary": "Aucune alerte",
+                            "secondary": "Tout est OK",
+                            "icon": "mdi:check-circle-outline",
+                            "icon_color": "green",
+                            "multiline_secondary": true
+                          }
+                        ]
+                      }}
+                    {% else %}
+                      {% set ns = namespace(cards=[]) %}
+                      {% for e in filtered %}
+                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set notified_count = e.notified_people | default([], true) | length %}
+                        {% set recipients_count = recipients | length %}
+                        {% set card = {
+                          "type": "custom:mushroom-template-card",
+                          "primary": e.title,
+                          "secondary": e.message ~ "\n👥 " ~ notified_count ~ " / " ~ recipients_count ~ " notifiés\nMaintenir appuyé pour supprimer",
+                          "icon": "mdi:alert-circle",
+                          "icon_color": "red",
+                          "multiline_secondary": true,
+                          "hold_action": {
+                            "action": "perform-action",
+                            "perform_action": "notification_engine.delete_event",
+                            "data": { "id": e.id }
+                          }
+                        } %}
+                        {% set ns.cards = ns.cards + [card] %}
+                      {% endfor %}
+                      {{ ns.cards }}
+                    {% endif %}
+          - type: vertical-stack
+            cards:
+              - type: heading
+                heading: 👀 Présence
+                heading_style: title
+              - type: custom:auto-entities
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                card_param: cards
+                filter:
+                  template: >-
+                    {% set events =
+                    state_attr('sensor.notifications_evenements', 'events') |
+                    default([], true) %} {% set filtered = events |
+                    selectattr('strategy', 'equalto', 'present') | list %}
+
+                    {% if filtered | length == 0 %}
+                      {{
+                        [
+                          {
+                            "type": "custom:mushroom-template-card",
+                            "primary": "Aucune notification de présence",
+                            "secondary": "Rien en attente",
+                            "icon": "mdi:check-circle-outline",
+                            "icon_color": "green",
+                            "multiline_secondary": true
+                          }
+                        ]
+                      }}
+                    {% else %}
+                      {% set ns = namespace(cards=[]) %}
+                      {% for e in filtered %}
+                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set notified_count = e.notified_people | default([], true) | length %}
+                        {% set recipients_count = recipients | length %}
+                        {% set card = {
+                          "type": "custom:mushroom-template-card",
+                          "primary": e.title,
+                          "secondary": e.message ~ "\n👥 " ~ notified_count ~ " / " ~ recipients_count ~ " notifiés\nMaintenir appuyé pour supprimer",
+                          "icon": "mdi:home-account",
+                          "multiline_secondary": true,
+                          "hold_action": {
+                            "action": "perform-action",
+                            "perform_action": "notification_engine.delete_event",
+                            "data": { "id": e.id }
+                          }
+                        } %}
+                        {% set ns.cards = ns.cards + [card] %}
+                      {% endfor %}
+                      {{ ns.cards }}
+                    {% endif %}
+          - type: vertical-stack
+            cards:
+              - type: heading
+                heading: ⏱️ Dès que possible
+                heading_style: title
+              - type: custom:auto-entities
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                card_param: cards
+                filter:
+                  template: >-
+                    {% set events =
+                    state_attr('sensor.notifications_evenements', 'events') |
+                    default([], true) %} {% set filtered = events |
+                    selectattr('strategy', 'equalto', 'asap') | list %}
+
+                    {% if filtered | length == 0 %}
+                      {{
+                        [
+                          {
+                            "type": "custom:mushroom-template-card",
+                            "primary": "Aucune notification ASAP",
+                            "secondary": "Rien en attente",
+                            "icon": "mdi:check-circle-outline",
+                            "icon_color": "green",
+                            "multiline_secondary": true
+                          }
+                        ]
+                      }}
+                    {% else %}
+                      {% set ns = namespace(cards=[]) %}
+                      {% for e in filtered %}
+                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set notified_count = e.notified_people | default([], true) | length %}
+                        {% set recipients_count = recipients | length %}
+                        {% set card = {
+                          "type": "custom:mushroom-template-card",
+                          "primary": e.title,
+                          "secondary": e.message ~ "\n👥 " ~ notified_count ~ " / " ~ recipients_count ~ " notifiés\nMaintenir appuyé pour supprimer",
+                          "icon": "mdi:timer-alert",
+                          "icon_color": "orange",
+                          "multiline_secondary": true,
+                          "hold_action": {
+                            "action": "perform-action",
+                            "perform_action": "notification_engine.delete_event",
+                            "data": { "id": e.id }
+                          }
+                        } %}
+                        {% set ns.cards = ns.cards + [card] %}
+                      {% endfor %}
+                      {{ ns.cards }}
+                    {% endif %}
+          - type: vertical-stack
+            cards:
+              - type: heading
+                heading: 🔙 Oublis / rappels
+                heading_style: title
+              - type: custom:auto-entities
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                card_param: cards
+                filter:
+                  template: >-
+                    {% set events =
+                    state_attr('sensor.notifications_evenements', 'events') |
+                    default([], true) %} {% set filtered = events |
+                    selectattr('strategy', 'equalto', 'away_reminder') | list %}
+
+                    {% if filtered | length == 0 %}
+                      {{
+                        [
+                          {
+                            "type": "custom:mushroom-template-card",
+                            "primary": "Aucun oubli / rappel",
+                            "secondary": "Rien en attente",
+                            "icon": "mdi:check-circle-outline",
+                            "icon_color": "green",
+                            "multiline_secondary": true
+                          }
+                        ]
+                      }}
+                    {% else %}
+                      {% set ns = namespace(cards=[]) %}
+                      {% for e in filtered %}
+                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set notified_count = e.notified_people | default([], true) | length %}
+                        {% set recipients_count = recipients | length %}
+                        {% set card = {
+                          "type": "custom:mushroom-template-card",
+                          "primary": e.title,
+                          "secondary": e.message ~ "\n👥 " ~ notified_count ~ " / " ~ recipients_count ~ " notifiés\nMaintenir appuyé pour supprimer",
+                          "icon": "mdi:map-marker-alert",
+                          "icon_color": "orange",
+                          "multiline_secondary": true,
+                          "hold_action": {
+                            "action": "perform-action",
+                            "perform_action": "notification_engine.delete_event",
+                            "data": { "id": e.id }
+                          }
+                        } %}
+                        {% set ns.cards = ns.cards + [card] %}
+                      {% endfor %}
+                      {{ ns.cards }}
+                    {% endif %}
+          - type: heading
+            heading: ''
+            heading_style: divider
+          - type: custom:mushroom-template-card
+            primary: Purger tous les événements
+            secondary: Supprime tous les événements stockés par le moteur
+            icon: mdi:delete-sweep
+            icon_color: red
+            multiline_secondary: true
+            tap_action:
+              action: perform-action
+              perform_action: notification_engine.purge_events
+            grid_options:
+              columns: full
+            visibility:
+              - condition: numeric_state
+                entity: sensor.notifications_evenements
+                above: 0
+      - type: grid
+        cards:
+          - type: heading
+            heading: Tests
+            heading_style: title
+            icon: mdi:test-tube
+          - type: vertical-stack
+            cards:
+              - type: heading
+                heading: Sélection personnes
+                heading_style: subtitle
+              - type: custom:auto-entities
+                card:
+                  type: grid
+                  columns: 5
+                  square: false
+                card_param: cards
+                filter:
+                  template: >-
+                    {% set raw = states('text.notification_engine_test_targets')
+                    %} {% set selected = raw.split(',') | map('trim') |
+                    reject('equalto', '') | list %} {% set ns =
+                    namespace(cards=[]) %} {% for p in states.person |
+                    sort(attribute='name') %}
+                      {% set eid = p.entity_id %}
+                      {% set active = eid in selected %}
+                      {% if active %}
+                        {% set next = selected | reject('equalto', eid) | list %}
+                      {% else %}
+                        {% set next = (selected + [eid]) | unique | list %}
+                      {% endif %}
+                      {% set card = {
+                        "type": "custom:button-card",
+                        "name": p.name,
+                        "icon": "mdi:check-circle" if active else "mdi:circle-outline",
+                        "show_icon": true,
+                        "show_name": true,
+                        "size": "16px",
+                        "styles": {
+                          "card": [
+                            "height: 32px",
+                            "padding: 0 8px",
+                            "border-radius: 10px",
+                            "display: grid",
+                            "grid-template-columns: 18px minmax(0, 1fr)",
+                            "grid-template-areas: \"i n\"",
+                            "align-items: center",
+                            "column-gap: 8px",
+                            "border: 1px solid " ~ ("var(--success-color)" if active else "var(--divider-color)")
+                          ],
+                          "name": [
+                            "justify-self: start",
+                            "font-size: 13px",
+                            "line-height: 1.1"
+                          ],
+                          "icon": ["color: " ~ ("var(--success-color)" if active else "var(--secondary-text-color)")]
+                        },
+                        "tap_action": {
+                          "action": "perform-action",
+                          "perform_action": "text.set_value",
+                          "data": {
+                            "entity_id": "text.notification_engine_test_targets",
+                            "value": next | join(',')
+                          }
+                        }
+                      } %}
+                      {% set ns.cards = ns.cards + [card] %}
+                    {% endfor %} {{ ns.cards }}
+            grid_options:
+              columns: full
+          - type: vertical-stack
+            cards:
+              - type: heading
+                icon: ''
+                heading: Envoyer un test
+                heading_style: subtitle
+              - type: grid
+                square: false
+                columns: 5
+                cards:
+                  - type: custom:button-card
+                    name: Alert
+                    icon: mdi:bell-ring-outline
+                    styles:
+                      icon:
+                        - color: var(--error-color)
+                    tap_action:
+                      action: perform-action
+                      perform_action: notification_engine.create_event
+                      data:
+                        key: test_dashboard_notifications
+                        strategy: alert
+                        source_entity: dashboard
+                        context_label: Test dashboard
+                        title: 🚨🧪 Test notification
+                        message: Notification de test
+                        targets: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
+                        actions:
+                          - action: DONE
+                            title: OK
+                  - type: custom:button-card
+                    name: Present
+                    icon: mdi:home-outline
+                    styles:
+                      icon:
+                        - color: var(--success-color)
+                    tap_action:
+                      action: perform-action
+                      perform_action: notification_engine.create_event
+                      data:
+                        key: test_dashboard_notifications
+                        strategy: present
+                        source_entity: dashboard
+                        context_label: Test dashboard
+                        title: 👀🧪 Test notification
+                        message: Notification de test
+                        targets: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
+                        actions:
+                          - action: DONE
+                            title: OK
+                  - type: custom:button-card
+                    name: Asap
+                    icon: mdi:clock-alert-outline
+                    styles:
+                      icon:
+                        - color: var(--warning-color)
+                    tap_action:
+                      action: perform-action
+                      perform_action: notification_engine.create_event
+                      data:
+                        key: test_dashboard_notifications
+                        strategy: asap
+                        source_entity: dashboard
+                        context_label: Test dashboard
+                        title: ⏱️🧪 Test notification
+                        message: Notification de test
+                        targets: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
+                        actions:
+                          - action: DONE
+                            title: OK
+                  - type: custom:button-card
+                    name: Away
+                    icon: mdi:home-export-outline
+                    styles:
+                      icon:
+                        - color: var(--info-color)
+                    tap_action:
+                      action: perform-action
+                      perform_action: notification_engine.create_event
+                      data:
+                        key: test_dashboard_notifications
+                        strategy: away_reminder
+                        source_entity: dashboard
+                        context_label: Test dashboard
+                        title: 🔙🧪 Test notification
+                        message: Notification de test
+                        targets: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
+                        actions:
+                          - action: DONE
+                            title: OK
+                  - type: custom:button-card
+                    name: Info
+                    icon: mdi:information-outline
+                    styles:
+                      icon:
+                        - color: var(--info-color)
+                    tap_action:
+                      action: perform-action
+                      perform_action: notification_engine.create_event
+                      data:
+                        key: test_dashboard_notifications
+                        strategy: info
+                        source_entity: dashboard
+                        context_label: Test dashboard
+                        title: ℹ️🧪 Test info
+                        message: Notification d'information
+                        targets: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
+                        actions:
+                          - action: DONE
+                            title: OK
+                grid_options:
+                  columns: full
+            grid_options:
+              columns: full
+        column_span: 2
+    cards: []
