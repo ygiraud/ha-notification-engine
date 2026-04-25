@@ -6,7 +6,7 @@
   "documentation": "https://github.com/ygiraud/ha-notification-engine",
   "issue_tracker": "https://github.com/ygiraud/ha-notification-engine/issues",
   "codeowners": [],
-  "dependencies": [],
+  "dependencies": ["lovelace"],
   "requirements": [],
   "integration_type": "service",
   "iot_class": "local_push"

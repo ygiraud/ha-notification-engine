@@ -17,7 +17,9 @@ from homeassistant.components.lovelace.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+import voluptuous as vol
 
 from .const import (
     CONF_AWAY_REMINDER_MAX_DISTANCE_M,
@@ -57,6 +59,28 @@ LOVELACE_CONF_MODE = "mode"
 LOVELACE_CONF_REQUIRE_ADMIN = "require_admin"
 LOVELACE_CONF_SHOW_IN_SIDEBAR = "show_in_sidebar"
 LOVELACE_CONF_TITLE = "title"
+
+CONFIG_SCHEMA = vol.Schema(
+    {
+        DOMAIN: vol.Schema(
+            {
+                vol.Optional(CONF_PEOPLE, default={}): dict,
+                vol.Optional(CONF_AWAY_REMINDER_MODE, default=DEFAULT_AWAY_REMINDER_MODE): cv.string,
+                vol.Optional(
+                    CONF_AWAY_REMINDER_TOLERANCE_M,
+                    default=DEFAULT_AWAY_REMINDER_TOLERANCE_M,
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_AWAY_REMINDER_MAX_DISTANCE_M,
+                    default=DEFAULT_AWAY_REMINDER_MAX_DISTANCE_M,
+                ): vol.Coerce(float),
+                vol.Optional(CONF_INSTALL_DASHBOARD, default=DEFAULT_INSTALL_DASHBOARD): cv.boolean,
+            },
+            extra=vol.ALLOW_EXTRA,
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
+)
 
 
 def _service_parts(service_name: str) -> tuple[str, str] | None:
