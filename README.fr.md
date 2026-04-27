@@ -107,7 +107,7 @@ Si un événement est créé mais qu'aucune notification n'est envoyée, vérifi
 - la personne existe dans `notification_engine.people`
 - `enabled: true`
 - `notify_service` est valide et fonctionnel
-- les `targets` de l'événement correspondent à des entités `person.*` configurées
+- le `target` du service correspond à des entités `person.*` configurées
 
 Fallback `away_reminder` quand la distance est inexploitable:
 

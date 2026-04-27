@@ -97,8 +97,7 @@ def make_event(
     key: str,
     source: str = "",
     label: str = "",
-    person: str = "",
-    targets: list[str] | None = None,
+    recipients: list[str] | None = None,
     strategy: str = "",
     title: str = "",
     message: str = "",
@@ -120,8 +119,7 @@ def make_event(
             "updated_at": now,
             "source_entity": source,
             "context_label": label,
-            "person_entity": person,
-            "targets": targets or [],
+            "recipients": recipients or [],
             "actions": actions or [],
             "notified_people": [],
             "history": [{"at": now, "action": "created"}],
@@ -169,15 +167,14 @@ class NotificationEventEngine:
         key: str,
         source: str = "",
         label: str = "",
-        person: str = "",
-        targets: list[str] | None = None,
+        recipients: list[str] | None = None,
         strategy: str = "",
         title: str = "",
         message: str = "",
         actions: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Create event with idempotent deduplication."""
-        target_list = targets or []
+        recipient_list = recipients or []
         action_list = actions or []
         events = self.load_events()
 
@@ -187,8 +184,7 @@ class NotificationEventEngine:
                 and event.get("key") == key
                 and event.get("source_entity", "") == source
                 and event.get("context_label", "") == label
-                and event.get("person_entity", "") == person
-                and event.get("targets", []) == target_list
+                and event.get("recipients", []) == recipient_list
                 and event.get("strategy", "") == strategy
                 and event.get("title", "") == title
                 and event.get("message", "") == message
@@ -200,8 +196,7 @@ class NotificationEventEngine:
             key=key,
             source=source,
             label=label,
-            person=person,
-            targets=target_list,
+            recipients=recipient_list,
             strategy=strategy,
             title=title,
             message=message,

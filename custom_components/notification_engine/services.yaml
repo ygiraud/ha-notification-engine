@@ -1,6 +1,9 @@
 create_event:
   name: Create event
   description: Create a notification event with idempotent deduplication.
+  target:
+    entity:
+      domain: person
   fields:
     key:
       name: Event key
@@ -34,12 +37,6 @@ create_event:
       required: false
       selector:
         text:
-    person_entity:
-      name: Person entity
-      description: Optional single person entity.
-      required: false
-      selector:
-        text:
     title:
       name: Title
       description: Notification title.
@@ -52,14 +49,6 @@ create_event:
       required: true
       selector:
         text:
-    targets:
-      name: Targets
-      description: Person entities.
-      required: false
-      selector:
-        entity:
-          domain: person
-          multiple: true
     actions:
       name: Actions
       description: JSON array with action/title objects.
@@ -75,6 +64,9 @@ list_events:
 send_info:
   name: Send info
   description: Send an immediate notification without creating an event.
+  target:
+    entity:
+      domain: person
   fields:
     title:
       name: Title
@@ -86,14 +78,6 @@ send_info:
       required: true
       selector:
         text:
-    targets:
-      name: Targets
-      description: Person entities.
-      required: false
-      selector:
-        entity:
-          domain: person
-          multiple: true
 
 process_events:
   name: Process events

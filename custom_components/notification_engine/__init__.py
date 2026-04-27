@@ -109,6 +109,10 @@ def _normalize_entities(value: Any) -> list[str]:
     if value is None:
         return []
 
+    if isinstance(value, dict):
+        # Home Assistant service target payload often uses {"entity_id": ...}.
+        return _normalize_entities(value.get("entity_id"))
+
     if isinstance(value, str):
         raw = value.strip()
         if not raw:
@@ -133,6 +137,16 @@ def _normalize_entities(value: Any) -> list[str]:
         return normalized
 
     return []
+
+
+def _active_people_entities(people: dict[str, dict[str, Any]]) -> list[str]:
+    """Return all enabled person entities from integration config."""
+    return [person for person, person_cfg in people.items() if _person_enabled(person_cfg)]
+
+
+def _extract_target_entities(data: dict[str, Any]) -> list[str]:
+    """Extract recipients from Home Assistant standard service target."""
+    return _normalize_entities(data.get("target"))
 
 
 def _entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -242,14 +256,23 @@ async def _sync_dashboard(hass: HomeAssistant, cfg: dict[str, Any]) -> None:
     _register_dashboard_panel(hass)
 
 
-def _event_recipients(hass: HomeAssistant, event: dict[str, Any]) -> list[str]:
+def _event_recipients(event: dict[str, Any], people: dict[str, dict[str, Any]]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
 
-    targets = _normalize_entities(event.get("targets", []))
-    for item in targets:
+    recipients = _normalize_entities(event.get("recipients", []))
+    for item in recipients:
         person = str(item)
         if person and person not in seen:
+            seen.add(person)
+            result.append(person)
+
+    if result:
+        return result
+
+    # Fallback: notify all active people when no explicit recipient is set.
+    for person in _active_people_entities(people):
+        if person not in seen:
             seen.add(person)
             result.append(person)
 
@@ -321,7 +344,7 @@ async def _process_events_core(hass: HomeAssistant) -> dict[str, Any]:
         if event.get("status") != "pending":
             continue
 
-        recipients = _event_recipients(hass, event)
+        recipients = _event_recipients(event, people)
         notified = set(event.get("notified_people", []))
         strategy = str(event.get("strategy", ""))
 
@@ -438,8 +461,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             str(call.data.get("key", "")),
             str(call.data.get("source_entity", "")),
             str(call.data.get("context_label", "")),
-            str(call.data.get("person_entity", "")),
-            _normalize_entities(call.data.get("targets", [])),
+            _extract_target_entities(call.data),
             str(call.data.get("strategy", "")),
             str(call.data.get("title", "")),
             str(call.data.get("message", "")),
@@ -456,11 +478,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def _send_info(call: ServiceCall) -> ServiceResponse:
         title = str(call.data.get("title", ""))
         message = str(call.data.get("message", ""))
-        event_like = {
-            "targets": _normalize_entities(call.data.get("targets", [])),
-        }
-        recipients = _event_recipients(hass, event_like)
         people = _people_config(domain_data)
+        event_like = {
+            "recipients": _extract_target_entities(call.data),
+        }
+        recipients = _event_recipients(event_like, people)
         sent = 0
         for person in recipients:
             person_cfg = people.get(person, {})

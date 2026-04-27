@@ -43,7 +43,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set recipients = e.recipients | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -97,7 +97,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set recipients = e.recipients | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -150,7 +150,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set recipients = e.recipients | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -204,7 +204,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.targets | default([], true) | unique | list %}
+                        {% set recipients = e.recipients | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -338,11 +338,12 @@ views:
                         context_label: Test dashboard
                         title: 🚨🧪 Test notification
                         message: Notification de test
-                        targets: |-
-                          [[[
-                            const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                          ]]]
+                        target:
+                          entity_id: |-
+                            [[[
+                              const raw = states['text.notification_engine_test_targets']?.state || '';
+                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -362,11 +363,12 @@ views:
                         context_label: Test dashboard
                         title: 👀🧪 Test notification
                         message: Notification de test
-                        targets: |-
-                          [[[
-                            const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                          ]]]
+                        target:
+                          entity_id: |-
+                            [[[
+                              const raw = states['text.notification_engine_test_targets']?.state || '';
+                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -386,11 +388,12 @@ views:
                         context_label: Test dashboard
                         title: ⏱️🧪 Test notification
                         message: Notification de test
-                        targets: |-
-                          [[[
-                            const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                          ]]]
+                        target:
+                          entity_id: |-
+                            [[[
+                              const raw = states['text.notification_engine_test_targets']?.state || '';
+                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -410,11 +413,12 @@ views:
                         context_label: Test dashboard
                         title: 🔙🧪 Test notification
                         message: Notification de test
-                        targets: |-
-                          [[[
-                            const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                          ]]]
+                        target:
+                          entity_id: |-
+                            [[[
+                              const raw = states['text.notification_engine_test_targets']?.state || '';
+                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -434,11 +438,12 @@ views:
                         context_label: Test dashboard
                         title: ℹ️🧪 Test info
                         message: Notification d'information
-                        targets: |-
-                          [[[
-                            const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                          ]]]
+                        target:
+                          entity_id: |-
+                            [[[
+                              const raw = states['text.notification_engine_test_targets']?.state || '';
+                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            ]]]
                         actions:
                           - action: DONE
                             title: OK

@@ -107,14 +107,14 @@ If an event is created but no notification is sent, check:
 - the person exists in `notification_engine.people`
 - `enabled: true`
 - `notify_service` is valid and working
-- event `targets` match configured `person.*` entities
+- service `target` matches configured `person.*` entities
 
 `away_reminder` fallback behavior when distance cannot be used:
 
 - missing `proximity_sensor`
 - missing sensor entity
 - non-numeric sensor state
-- no valid distance sensors available among targets
+- no valid distance sensors available among recipients
 
 In these cases, the integration falls back to sending to all targeted people.
 
