@@ -36,5 +36,12 @@
     "error": {
       "invalid_people_json": "invalid_people_json"
     }
+  },
+  "entity": {
+    "sensor": {
+      "events": {
+        "name": "notification_engine_events"
+      }
+    }
   }
 }

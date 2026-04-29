@@ -6,7 +6,7 @@ Version anglaise: [README.md](README.md)
 
 ## Fonctionnalités
 
-- Services `notification_engine.*` pour créer, traiter, acquitter et purger des événements
+- Services `notification_engine.*` pour créer, traiter, supprimer et purger des événements
 - Persistance des événements dans `.storage/notification_engine_events.json`
 - Stratégies de diffusion:
   - `present`
@@ -60,9 +60,7 @@ custom_components/
 - `notification_engine.list_events`
 - `notification_engine.send_info`
 - `notification_engine.process_events`
-- `notification_engine.ack_event`
 - `notification_engine.notify_person`
-- `notification_engine.cleanup_events`
 - `notification_engine.delete_event`
 - `notification_engine.purge_events`
 
@@ -94,6 +92,12 @@ Note d'usage:
   - mode `nearest`: envoi à la/aux personne(s) la/les plus proche(s) selon `away_reminder_tolerance_m` et `away_reminder_max_distance_m`.
 - `alert`: envoi immédiat à toutes les personnes ciblées.
 - `info`: envoi immédiat à toutes les personnes ciblées, puis suppression automatique de l'événement après diffusion.
+
+## Breaking changes en 0.2.0
+
+- `notification_engine.ack_event` a été supprimé.
+- `notification_engine.cleanup_events` a été supprimé au profit de `notification_engine.purge_events`.
+- Les actions mobiles `DONE` suppriment désormais directement l'événement au lieu de changer son statut.
 
 ## Limitation actuelle
 

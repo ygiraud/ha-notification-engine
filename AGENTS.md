@@ -40,15 +40,13 @@
 ### Commands
 
 - Home Assistant services exposed by integration:
-  - `notification_engine.create_event`
-  - `notification_engine.list_events`
-  - `notification_engine.send_info`
-  - `notification_engine.process_events`
-  - `notification_engine.ack_event`
-  - `notification_engine.notify_person`
-  - `notification_engine.cleanup_events`
-  - `notification_engine.delete_event`
-  - `notification_engine.purge_events`
+- `notification_engine.create_event`
+- `notification_engine.list_events`
+- `notification_engine.send_info`
+- `notification_engine.process_events`
+- `notification_engine.notify_person`
+- `notification_engine.delete_event`
+- `notification_engine.purge_events`
 
 ### Notes
 

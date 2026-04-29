@@ -83,22 +83,6 @@ process_events:
   name: Process events
   description: Process pending events and send notifications according to strategy.
 
-ack_event:
-  name: Ack event
-  description: Update event status (typically done).
-  fields:
-    id:
-      name: Event id
-      required: true
-      selector:
-        text:
-    status:
-      name: Status
-      required: false
-      default: done
-      selector:
-        text:
-
 notify_person:
   name: Mark person notified
   description: Mark one person as notified for an event.
@@ -113,10 +97,6 @@ notify_person:
       required: true
       selector:
         text:
-
-cleanup_events:
-  name: Cleanup events
-  description: Delete all events that are not pending.
 
 delete_event:
   name: Delete event

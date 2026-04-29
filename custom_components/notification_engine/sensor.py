@@ -17,7 +17,7 @@ class NotificationEventsSensor(CoordinatorEntity, SensorEntity):
     """Expose notification events for dashboards/templates."""
 
     _attr_has_entity_name = False
-    _attr_name = "Notifications événements"
+    _attr_translation_key = "events"
     _attr_unique_id = "notification_engine_notifications_evenements"
     _attr_icon = "mdi:message-badge"
 

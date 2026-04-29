@@ -36,5 +36,12 @@
     "error": {
       "invalid_people_json": "Invalid JSON format for people mapping."
     }
+  },
+  "entity": {
+    "sensor": {
+      "events": {
+        "name": "Notification Engine Events"
+      }
+    }
   }
 }

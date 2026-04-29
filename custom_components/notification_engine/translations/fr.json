@@ -36,5 +36,12 @@
     "error": {
       "invalid_people_json": "Format JSON invalide pour la configuration des personnes."
     }
+  },
+  "entity": {
+    "sensor": {
+      "events": {
+        "name": "Événements Notification Engine"
+      }
+    }
   }
 }
