@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 from pathlib import Path
@@ -44,6 +45,7 @@ NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
+send_to_notify = DELIVERY_MODULE.send_to_notify
 
 
 def test_parse_actions_accepts_json_and_python_literal() -> None:
@@ -125,6 +127,70 @@ def test_select_nearest_recipients_uses_tolerance_and_fallback() -> None:
         tolerance=10.0,
         max_distance=50.0,
     ) == ["person.alice", "person.bob"]
+
+
+def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -> None:
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+
+    hass = _Hass()
+
+    asyncio.run(
+        send_to_notify(
+            hass,
+            "notify.mobile_app_alice",
+            title="Alert",
+            message="Immediate action required",
+            tag="alert-tag",
+            actions=[],
+            strategy="alert",
+        )
+    )
+    asyncio.run(
+        send_to_notify(
+            hass,
+            "notify.mobile_app_alice",
+            title="Info",
+            message="FYI",
+            tag="info-tag",
+            actions=[],
+            strategy="info",
+        )
+    )
+
+    alert_payload = hass.services.calls[0][2]
+    info_payload = hass.services.calls[1][2]
+
+    assert alert_payload["data"]["ttl"] == 0
+    assert alert_payload["data"]["priority"] == "high"
+    assert alert_payload["data"]["channel"] == "alarm_stream"
+    assert alert_payload["data"]["push"] == {
+        "interruption-level": "critical",
+        "sound": {
+            "name": "default",
+            "critical": 1,
+            "volume": 1.0,
+        },
+    }
+    assert "ttl" not in info_payload["data"]
+    assert "priority" not in info_payload["data"]
+    assert "channel" not in info_payload["data"]
+    assert "push" not in info_payload["data"]
 
 
 def test_create_event_is_idempotent_for_same_pending_payload(tmp_path) -> None:

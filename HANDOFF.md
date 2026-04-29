@@ -4,14 +4,14 @@
 
 - Name: Codex
 - Date: 2026-04-29 Europe/Paris (UTC+2)
-- Context: Deuxieme passe d'implementation. Ajout du branchement `translation_key` pour le sensor et extraction de la logique de livraison dans `delivery.py`. Le user a explicitement ecarte la mise en place d'une vraie base de tests Home Assistant pour le moment.
+- Context: Durcissement multiplateforme de la strategie `alert` avec notification critique iPhone et canal `alarm_stream` sur Android, tests unitaires, bump de version et note explicite dans la documentation.
 
 ---
 
 ## Objective
 
-- Current goal: Faire passer le projet de "beta near-production" a "production-ready" en couvrant les angles morts identifies par l'analyse Claude (tests, refactor, docstrings, i18n, simplification de la surface des services). Le DND bypass est reporte a un cycle ulterieur.
-- Scope: Implementation technique dans `custom_components/notification_engine/`. Pas de redesign de l'API publique. Conservation stricte du contrat de reponse des services (`{"ok": true/false, ...}`).
+- Current goal: Objectif DND bypass `alert` realise. Prochaine priorite: reprendre le backlog technique restant sans modifier l'API publique.
+- Scope: Changements livres dans `custom_components/notification_engine/`, tests unitaires Python purs, documentation et version alignes.
 
 ---
 
@@ -34,6 +34,14 @@
 - ✅ README / README.fr / AGENTS alignes avec la nouvelle surface de services
 - ✅ Test unitaire ajoute sur la selection `nearest` sans dependance Home Assistant
 - ✅ Correction du ratio de personnes notifiees sur le dashboard quand `recipients` est vide et que le fallback "toutes les personnes actives" est utilise
+- ✅ DND bypass implemente pour la strategie `alert` dans `delivery.py`
+- ✅ Test unitaire ajoute pour verifier que `alert` injecte bien `ttl`, `priority` et `push.interruption-level`, et que `info` ne les injecte pas
+- ✅ Version bump `0.2.0` -> `0.2.1`
+- ✅ README / README.fr mis a jour pour documenter le comportement DND mobile de `alert`
+- ✅ Validation locale via `.venv/bin/pytest -q` (`11 passed`)
+- ✅ Strategie `alert` durcie en notification critique iPhone (`interruption-level: critical` + son critique)
+- ✅ Strategie `alert` completee sur Android avec `channel: alarm_stream`
+- ✅ Documentation renforcee avec une note importante sur le caractere intrusif de `alert`
 
 ---
 
@@ -41,21 +49,21 @@
 
 - `.github/workflows/ci.yml` - installation de `pytest` + execution des tests
 - `AGENTS.md` - suppression de `ack_event` et `cleanup_events` de la liste des commandes
-- `README.md` - surface de services, breaking changes 0.2.0
-- `README.fr.md` - surface de services, breaking changes 0.2.0
+- `README.md` - surface de services, breaking changes 0.2.0, comportement DND mobile critique de `alert`
+- `README.fr.md` - surface de services, breaking changes 0.2.0, comportement DND mobile critique de `alert`
 - `custom_components/notification_engine/__init__.py` - deregistration de `ack_event` / `cleanup_events`, handler mobile `DONE` -> `delete_event`
 - `custom_components/notification_engine/__init__.py` - lazy imports Lovelace/frontend pour eviter un import bloquant au chargement
 - `custom_components/notification_engine/const.py` - constantes de services retirees
-- `custom_components/notification_engine/manifest.json` - version `0.2.0`
+- `custom_components/notification_engine/manifest.json` - version `0.2.3`
 - `custom_components/notification_engine/sensor.py` - nom EN du sensor
-- `custom_components/notification_engine/delivery.py` - helpers de livraison extraits depuis `__init__.py`
+- `custom_components/notification_engine/delivery.py` - helpers de livraison extraits depuis `__init__.py` + payload mobile critique pour `alert` + canal Android `alarm_stream`
 - `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` - affichage du ratio base sur `resolved_recipients` avec fallback retrocompatible
 - `custom_components/notification_engine/event_engine.py` - persistance d'un champ `resolved_recipients` sans impacter `recipients`
 - `custom_components/notification_engine/strings.json` - declaration du `translation_key` du sensor
 - `custom_components/notification_engine/translations/en.json` - nom EN du sensor
 - `custom_components/notification_engine/translations/fr.json` - nom FR du sensor
 - `custom_components/notification_engine/services.yaml` - suppression de `ack_event` / `cleanup_events`
-- `tests/test_event_engine.py` - couverture unitaire du moteur pur + selection `nearest`
+- `tests/test_event_engine.py` - couverture unitaire du moteur pur + selection `nearest` + payload mobile critique `alert` + canal Android `alarm_stream`
 - `HANDOFF.md` - etat de transmission mis a jour
 
 ---
@@ -77,6 +85,10 @@
   - Reason: Les services publics sont supprimes comme demande, mais conserver ces methodes limite le refactor pendant cette passe et permet de documenter/tester le comportement historique avant suppression interne ulterieure.
 - Decision: Ne pas mettre en place `pytest-homeassistant-custom-component` a ce stade.
   - Reason: Decision utilisateur explicite du 2026-04-29. Cout d'installation et de maintenance juge trop eleve pour la taille actuelle du projet.
+- Decision: `alert` utilise des notifications critiques sur iPhone, pas seulement `time-sensitive`.
+  - Reason: Decision utilisateur explicite du 2026-04-29. Une alerte doit produire une interruption sonore/vibratoire et exiger une action immediate.
+- Decision: `alert` utilise aussi `channel: alarm_stream` sur Android.
+  - Reason: Sans canal adapte, `ttl: 0` et `priority: high` n'assurent pas a eux seuls un contournement robuste du DND ni un comportement sonore agressif sur Android.
 
 ---
 
@@ -88,6 +100,7 @@
 - 🟡 Risk: Le `translation_key` du sensor est branche, mais il n'a pas ete verifie sur une instance Home Assistant reelle dans cette session.
 - 🟡 Risk: Le warning runtime `Detected blocking call to import_module` devrait etre corrige par les lazy imports Lovelace/frontend, mais cela reste a verifier sur une instance Home Assistant reelle.
 - 🟡 Risk: La correction du dashboard s'applique au YAML versionne de l'integration. Si le dashboard a deja ete copie dans `config/dashboards/`, il faut recopier/reinstaller ce fichier pour voir le correctif.
+- 🟡 Risk: Le comportement critique `alert` est verifie sur le payload genere, pas sur un device iOS/Android reel. Le comportement final depend encore de la version des companion apps, des OS, des permissions actives sur l'iPhone et de la configuration du canal Android `alarm_stream`.
 - 🟡 Hygiene: `custom_components/notification_engine/.DS_Store` est toujours present dans le repo alors que `AGENTS.md` l'interdit. Pas touche dans cette passe car hors scope direct.
 
 ### Decisions utilisateur du 2026-04-29
@@ -97,7 +110,7 @@
 - ✅ `cleanup_events`: SUPPRESSION au profit de `purge_events` SANS filtre. Justification utilisateur: "purge dit bien ce que ca fait".
 - ✅ Couverture de tests: cible 70% en mode best-effort (pas de contrainte forte, pas de gate CI bloquant).
 - ✅ Base de tests Home Assistant complete: REPORTE / abandonne pour l'instant. Justification utilisateur: trop contraignant pour ce projet a ce stade.
-- ✅ DND bypass: REPORTE. Pas dans le perimetre de cette session. A reprendre dans un cycle futur.
+- ✅ DND bypass: decisions de conception arretees puis durcies le 2026-04-29 sur la strategie `alert`, avec passage en critique sur iPhone et `alarm_stream` sur Android.
 
 ---
 
@@ -135,14 +148,39 @@
   - `NotificationEventEngine` (contrat de persistance, garanties d'atomicite)
 - Style: docstrings Google ou NumPy, choisir et garder coherent.
 
-#### 5. ⏸️ DND bypass (REPORTE)
+#### 5. ✅ DND bypass `alert` - IMPLEMENTE ET DURCI
 
-- Decision utilisateur 2026-04-29: REPORTE. Pas dans le perimetre de cette session.
-- A reprendre plus tard. Pistes a conserver pour reference:
-  - `notify.mobile_app_*` avec `data.priority = "high"` + `data.channel = "alarm_stream"` (Android)
-  - `data.push.sound.critical = 1` (iOS, necessite entitlement Critical Alerts)
-  - Question ouverte: parametre `bypass_dnd: bool` sur `create_event` vs strategie dediee.
-- Aucune action immediate a entreprendre. Ne pas modifier le README pour l'instant.
+Resultat livre le 2026-04-29 :
+
+**Approche retenue : la strategie `alert` bypass toujours le DND, sans flag supplementaire, avec payload critique sur iPhone et canal dedie sur Android.**
+
+- Rationnel: `alert` signifie semantiquement "critique, action immediate". Le bypass DND est une consequence directe de cette urgence, pas un parametre orthogonal. Les autres strategies (`present`, `asap`, `away_reminder`, `info`) ne doivent PAS bypasser le DND.
+- Option ecartee: un flag `bypass_dnd: bool` sur `create_event`. Juge redondant avec la strategie, et sans utilite pour les cas concrets identifies (ex: un `away_reminder` ne doit pas reveiller quelqu'un en pleine nuit).
+
+**Gestion des plateformes : Option A — envoyer les deux sets de params.**
+
+- Pas de champ `platform` dans la config personne. On injecte les parametres iOS et Android simultanement ; chaque companion app prend ce qu'elle comprend et ignore le reste.
+- iOS: `data.push.interruption-level = "critical"` avec `data.push.sound` critique.
+- Android: `data.ttl = 0` + `data.priority = "high"` + `data.channel = "alarm_stream"`.
+
+**Implementation realisee — `delivery.py`, fonction `send_to_notify` :**
+
+```python
+if strategy == "alert":
+    payload["data"]["ttl"] = 0
+    payload["data"]["priority"] = "high"
+    payload["data"]["channel"] = "alarm_stream"
+    payload["data"]["push"] = {
+        "interruption-level": "critical",
+        "sound": {"name": "default", "critical": 1, "volume": 1.0},
+    }
+```
+
+- Aucune modification de `event_engine.py`, `services.yaml`, ni du schema des events.
+- Aucun nouveau champ en base/persistence.
+- ✅ Test unitaire ajoute dans `tests/test_event_engine.py` pour verifier que le payload genere par `send_to_notify` avec `strategy="alert"` contient bien les champs Android, le canal `alarm_stream` et le payload critique iOS, et qu'une autre strategie ne les contient pas.
+- ✅ Bump de version : `0.2.2` -> `0.2.3`.
+- ✅ `README.md` et `README.fr.md` mis a jour pour documenter le comportement DND critique de la strategie `alert`, son caractere intrusif et la dependance au canal Android.
 
 #### 6. 🟢 Sensor name FR -> EN
 
@@ -197,7 +235,7 @@
 
 ## Notes
 
-- Context: Projet passe a `v0.2.0` suite au breaking change de surface de services.
+- Context: Projet passe a `v0.2.3` apres durcissement de `alert` en notification critique iPhone et canal Android `alarm_stream`.
 - Assumptions: La structure du composant et les services exposes restent inchanges. Toute proposition de changement d'API doit etre validee avant implementation.
 - Things to check:
   - Avant chaque commit: `git status` + `git diff` + diagnostic

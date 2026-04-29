@@ -90,7 +90,7 @@ Usage note:
 - `away_reminder`: distance-based send logic using `people.<person>.proximity_sensor`.
   - mode `all`: send to all targeted people.
   - mode `nearest`: send to the nearest person(s) based on `away_reminder_tolerance_m` and `away_reminder_max_distance_m`.
-- `alert`: immediate send to all targeted people.
+- `alert`: immediate send to all targeted people and uses critical mobile notification settings on supported apps.
 - `info`: immediate send to all targeted people, then auto-delete the event after delivery.
 
 ## Breaking changes in 0.2.0
@@ -99,10 +99,17 @@ Usage note:
 - `notification_engine.cleanup_events` has been removed in favor of `notification_engine.purge_events`.
 - Mobile `DONE` actions now delete the event directly instead of changing its status first.
 
-## Current limitation
+## Mobile DND behavior
 
-- DND bypass is not implemented yet for phone notifications.
-- DND bypass is planned for a future release.
+- `alert` adds Android high-priority delivery hints (`ttl: 0`, `priority: high`) and uses `channel: alarm_stream`.
+- `alert` adds iOS `interruption-level: critical` with critical sound payload.
+- Other strategies do not request DND/Focus bypass.
+
+Important:
+
+- `alert` is intentionally intrusive. On iPhone, it is meant to break through Focus/Do Not Disturb and play an audible critical alert.
+- On Android, the final DND/sound behavior still depends on how the `alarm_stream` notification channel is handled by the device and its system notification settings.
+- Use `alert` only for situations that require immediate action. Prefer `info`, `present`, `asap`, or `away_reminder` for non-critical events.
 
 ## Troubleshooting
 

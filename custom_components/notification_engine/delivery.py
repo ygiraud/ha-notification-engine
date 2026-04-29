@@ -137,6 +137,17 @@ async def send_to_notify(
         payload["data"]["icon"] = "mdi:information"
     elif strategy == "alert":
         payload["data"]["icon"] = "mdi:alert-circle"
+        payload["data"]["ttl"] = 0
+        payload["data"]["priority"] = "high"
+        payload["data"]["channel"] = "alarm_stream"
+        payload["data"]["push"] = {
+            "interruption-level": "critical",
+            "sound": {
+                "name": "default",
+                "critical": 1,
+                "volume": 1.0,
+            },
+        }
     if actions:
         payload["data"]["actions"] = actions[:3]
     await hass.services.async_call(domain, service, payload, blocking=True)

@@ -90,7 +90,7 @@ Note d'usage:
 - `away_reminder`: logique basée sur la distance via `people.<person>.proximity_sensor`.
   - mode `all`: envoi à toutes les personnes ciblées.
   - mode `nearest`: envoi à la/aux personne(s) la/les plus proche(s) selon `away_reminder_tolerance_m` et `away_reminder_max_distance_m`.
-- `alert`: envoi immédiat à toutes les personnes ciblées.
+- `alert`: envoi immédiat à toutes les personnes ciblées et utilise des réglages de notification mobile critiques sur les apps compatibles.
 - `info`: envoi immédiat à toutes les personnes ciblées, puis suppression automatique de l'événement après diffusion.
 
 ## Breaking changes en 0.2.0
@@ -99,10 +99,17 @@ Note d'usage:
 - `notification_engine.cleanup_events` a été supprimé au profit de `notification_engine.purge_events`.
 - Les actions mobiles `DONE` suppriment désormais directement l'événement au lieu de changer son statut.
 
-## Limitation actuelle
+## Comportement DND mobile
 
-- Le bypass DND n'est pas implémenté pour l'instant sur les notifications mobiles.
-- Le bypass DND est prévu pour une version future.
+- `alert` ajoute les hints Android haute priorité (`ttl: 0`, `priority: high`) et utilise `channel: alarm_stream`.
+- `alert` ajoute `interruption-level: critical` avec un payload de son critique sur iOS.
+- Les autres stratégies ne demandent pas de bypass DND/Focus.
+
+Important:
+
+- `alert` est volontairement intrusif. Sur iPhone, il est conçu pour traverser Focus / Ne pas déranger et produire une alerte sonore critique.
+- Sur Android, le comportement final vis-a-vis du DND et du son depend encore de la facon dont le canal `alarm_stream` est gere par l'appareil et ses reglages systeme de notifications.
+- Utiliser `alert` uniquement pour les situations qui exigent une action immédiate. Pour le non critique, préférer `info`, `present`, `asap` ou `away_reminder`.
 
 ## Dépannage
 
