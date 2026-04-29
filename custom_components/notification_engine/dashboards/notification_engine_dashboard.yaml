@@ -43,7 +43,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.recipients | default([], true) | unique | list %}
+                        {% set recipients = e.resolved_recipients | default(e.recipients, true) | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -97,7 +97,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.recipients | default([], true) | unique | list %}
+                        {% set recipients = e.resolved_recipients | default(e.recipients, true) | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -150,7 +150,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.recipients | default([], true) | unique | list %}
+                        {% set recipients = e.resolved_recipients | default(e.recipients, true) | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {
@@ -204,7 +204,7 @@ views:
                     {% else %}
                       {% set ns = namespace(cards=[]) %}
                       {% for e in filtered %}
-                        {% set recipients = e.recipients | default([], true) | unique | list %}
+                        {% set recipients = e.resolved_recipients | default(e.recipients, true) | default([], true) | unique | list %}
                         {% set notified_count = e.notified_people | default([], true) | length %}
                         {% set recipients_count = recipients | length %}
                         {% set card = {

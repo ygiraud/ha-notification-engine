@@ -90,6 +90,10 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     actions = parse_actions(raw_actions)
     normalized["actions"] = actions
     normalized["mobile_actions"] = build_mobile_actions(event_id, actions)
+    resolved_recipients = normalized.get("resolved_recipients", [])
+    if not isinstance(resolved_recipients, list):
+        resolved_recipients = []
+    normalized["resolved_recipients"] = [str(person) for person in resolved_recipients if str(person)]
     return normalized
 
 
@@ -98,6 +102,7 @@ def make_event(
     source: str = "",
     label: str = "",
     recipients: list[str] | None = None,
+    resolved_recipients: list[str] | None = None,
     strategy: str = "",
     title: str = "",
     message: str = "",
@@ -120,6 +125,7 @@ def make_event(
             "source_entity": source,
             "context_label": label,
             "recipients": recipients or [],
+            "resolved_recipients": resolved_recipients or [],
             "actions": actions or [],
             "notified_people": [],
             "history": [{"at": now, "action": "created"}],
@@ -168,6 +174,7 @@ class NotificationEventEngine:
         source: str = "",
         label: str = "",
         recipients: list[str] | None = None,
+        resolved_recipients: list[str] | None = None,
         strategy: str = "",
         title: str = "",
         message: str = "",
@@ -197,6 +204,7 @@ class NotificationEventEngine:
             source=source,
             label=label,
             recipients=recipient_list,
+            resolved_recipients=resolved_recipients or [],
             strategy=strategy,
             title=title,
             message=message,

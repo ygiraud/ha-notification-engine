@@ -256,12 +256,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     coordinator: DataUpdateCoordinator = domain_data["coordinator"]
 
     async def _create_event(call: ServiceCall) -> ServiceResponse:
+        explicit_recipients = _extract_target_entities(call.data)
+        resolved_recipients = event_recipients({"recipients": explicit_recipients}, people_config(domain_data))
         result = await hass.async_add_executor_job(
             engine.create_event,
             str(call.data.get("key", "")),
             str(call.data.get("source_entity", "")),
             str(call.data.get("context_label", "")),
-            _extract_target_entities(call.data),
+            explicit_recipients,
+            resolved_recipients,
             str(call.data.get("strategy", "")),
             str(call.data.get("title", "")),
             str(call.data.get("message", "")),

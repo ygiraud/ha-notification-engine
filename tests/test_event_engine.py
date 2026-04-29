@@ -184,6 +184,23 @@ def test_notify_person_updates_history_once(tmp_path) -> None:
     assert len(notified_entries) == 1
 
 
+def test_create_event_keeps_explicit_recipients_empty_but_stores_resolved_fallback(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    created = engine.create_event(
+        key="fallback",
+        recipients=[],
+        resolved_recipients=["person.alice", "person.bob"],
+        title="Fallback",
+        message="All active people",
+    )
+
+    stored = created["event"]
+    assert stored["recipients"] == []
+    assert stored["resolved_recipients"] == ["person.alice", "person.bob"]
+    assert engine.load_events()[0]["resolved_recipients"] == ["person.alice", "person.bob"]
+
+
 def test_ack_and_cleanup_preserve_current_internal_behavior(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
     first = engine.create_event(key="event-1", title="One", message="First")["event"]

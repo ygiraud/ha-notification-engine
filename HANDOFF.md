@@ -33,6 +33,7 @@
 - ✅ Version bump `0.1.2` -> `0.2.0`
 - ✅ README / README.fr / AGENTS alignes avec la nouvelle surface de services
 - ✅ Test unitaire ajoute sur la selection `nearest` sans dependance Home Assistant
+- ✅ Correction du ratio de personnes notifiees sur le dashboard quand `recipients` est vide et que le fallback "toutes les personnes actives" est utilise
 
 ---
 
@@ -48,6 +49,8 @@
 - `custom_components/notification_engine/manifest.json` - version `0.2.0`
 - `custom_components/notification_engine/sensor.py` - nom EN du sensor
 - `custom_components/notification_engine/delivery.py` - helpers de livraison extraits depuis `__init__.py`
+- `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` - affichage du ratio base sur `resolved_recipients` avec fallback retrocompatible
+- `custom_components/notification_engine/event_engine.py` - persistance d'un champ `resolved_recipients` sans impacter `recipients`
 - `custom_components/notification_engine/strings.json` - declaration du `translation_key` du sensor
 - `custom_components/notification_engine/translations/en.json` - nom EN du sensor
 - `custom_components/notification_engine/translations/fr.json` - nom FR du sensor
@@ -84,6 +87,7 @@
 - 🟡 Risk: La couverture ajoutee reste volontairement limitee a du Python pur. La selection `nearest` est maintenant testee via `delivery.py`, mais l'orchestration HA complete reste sans tests d'integration.
 - 🟡 Risk: Le `translation_key` du sensor est branche, mais il n'a pas ete verifie sur une instance Home Assistant reelle dans cette session.
 - 🟡 Risk: Le warning runtime `Detected blocking call to import_module` devrait etre corrige par les lazy imports Lovelace/frontend, mais cela reste a verifier sur une instance Home Assistant reelle.
+- 🟡 Risk: La correction du dashboard s'applique au YAML versionne de l'integration. Si le dashboard a deja ete copie dans `config/dashboards/`, il faut recopier/reinstaller ce fichier pour voir le correctif.
 - 🟡 Hygiene: `custom_components/notification_engine/.DS_Store` est toujours present dans le repo alors que `AGENTS.md` l'interdit. Pas touche dans cette passe car hors scope direct.
 
 ### Decisions utilisateur du 2026-04-29
