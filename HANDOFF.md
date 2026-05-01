@@ -34,6 +34,7 @@ Finaliser la v1.0.0 et preparer le commit/tag utilisateur.
 - ✅ Test ajoute pour `NotificationEventEngine.delete_event_by_key(key)`
 - ✅ Version bumpée `0.2.3` -> `1.0.0` dans `manifest.json`, `README.md`, `README.fr.md`
 - ✅ Workflow CI mis a jour : `actions/checkout@v4` -> `actions/checkout@v5` pour compatibilite Node 24
+- ✅ Workflow CI mis a jour : `actions/setup-python@v5` -> `actions/setup-python@v6` pour compatibilite Node 24
 
 ### Verification realisee
 
