@@ -31,6 +31,20 @@ notification_package = types.ModuleType("custom_components.notification_engine")
 notification_package.__path__ = [str(PACKAGE_DIR)]
 sys.modules.setdefault("custom_components.notification_engine", notification_package)
 
+homeassistant_package = types.ModuleType("homeassistant")
+homeassistant_package.__path__ = []
+sys.modules.setdefault("homeassistant", homeassistant_package)
+
+homeassistant_exceptions = types.ModuleType("homeassistant.exceptions")
+
+
+class HomeAssistantError(Exception):
+    """Minimal Home Assistant error stub for pure unit tests."""
+
+
+homeassistant_exceptions.HomeAssistantError = HomeAssistantError
+sys.modules.setdefault("homeassistant.exceptions", homeassistant_exceptions)
+
 _load_module("custom_components.notification_engine.const", PACKAGE_DIR / "const.py")
 EVENT_ENGINE_MODULE = _load_module(
     "custom_components.notification_engine.event_engine",
