@@ -109,6 +109,13 @@
 | `notification_engine.delete_event` | Supprimer un événement par clé logique ou id interne |
 | `notification_engine.purge_events` | Supprimer tous les événements |
 
+### Champs notables de `create_event`
+
+- `key` : clé logique d'événement utilisée pour la déduplication idempotente
+- `strategy` : comportement de diffusion (`present`, `asap`, `away_reminder`, `alert`, `info`)
+- `actions` : tableau JSON optionnel d'actions mobiles
+- `ttl_hours` : nombre positif optionnel ; les événements en attente expirés sont purgés automatiquement pendant `process_events`
+
 **Contrat de réponse :**
 
 ```yaml
@@ -253,6 +260,34 @@ automation:
 
 ---
 
+### TTL d'événement — Expiration automatique des événements en attente
+
+Utiliser `ttl_hours` lorsqu'un événement devient obsolète après un certain délai.
+
+```yaml
+automation:
+  alias: "Rappel: étendre le linge sous 6 heures"
+  trigger:
+    - platform: state
+      entity_id: sensor.lave_linge
+      to: "done"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id: person.alice
+      data:
+        key: etendre_linge
+        strategy: asap
+        title: "🧺 Étendre le linge"
+        message: "La machine est terminée. Étends le linge avant qu'il ne reste trop longtemps dedans."
+        ttl_hours: 6
+        actions: '[{"action":"DONE","title":"✅ Fait"}]'
+```
+
+Si l'événement est encore en attente après 6 heures, il est supprimé automatiquement au prochain passage de `notification_engine.process_events`.
+
+---
+
 ### Supprimer ou purger des événements
 
 ```yaml
@@ -348,12 +383,12 @@ tests/
 
 ### v1.1.0
 
-- **TTL des événements** — champ optionnel `ttl_hours` sur `create_event` ; les événements expirés sont supprimés automatiquement lors du `process_events`
+- ✅ **TTL des événements** — champ optionnel `ttl_hours` sur `create_event` ; les événements expirés sont supprimés automatiquement lors du `process_events`
 - **Re-notification** — renvoi d'un événement `asap` non acquitté après un délai configurable
 - **Filtres sur `purge_events`** — filtrer par stratégie, statut ou ancienneté (`older_than_hours`)
 - **Service `get_event`** — récupérer un événement par `key` ou `id`, utile pour les conditions de templates dans les automatisations
+- **Action `snooze`** — reporter un événement de N minutes depuis la notification mobile, sans le supprimer
 
 ### v1.2.0
 
-- **Action `snooze`** — reporter un événement de N minutes depuis la notification mobile, sans le supprimer
 - **Cibles notify alternatives** — support des services notify au-delà de `mobile_app_*` (Pushover, Telegram, etc.)

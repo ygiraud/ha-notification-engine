@@ -3,89 +3,115 @@
 ## Last Agent
 
 - Name: Codex
-- Date: 2026-05-01 Europe/Paris (UTC+2)
-- Context: Finalisation v1.0.0 cote implementation. Test manquant ajoute pour `delete_event_by_key` et version bumpée a `1.0.0`.
+- Date: 2026-05-02 Europe/Paris (UTC+2)
+- Context: Feature v1.1 #1 validated on HA instance after follow-up fixes: periodic processing added and mobile notification timeout aligned with event TTL.
 
 ---
 
 ## Objective
 
-Finaliser la v1.0.0 et preparer le commit/tag utilisateur.
+Implement v1.1 features one by one, each tied to a GitHub issue closed via commit message.
 
 ---
 
 ## Etat du projet au 2026-05-01
 
-### Ce qui est fait
+### v1.0.0 - Complete
 
-- ✅ Service `notify_person` supprime (etait trompeur, n'envoyait rien)
-- ✅ `delete_event` accepte `key` (recommande) ou `id` (interne) - methode `delete_event_by_key()` ajoutee dans `event_engine.py`
-- ✅ `purge_events` : doc corrigee (le parametre `status` n'existait pas)
-- ✅ `codeowners: ["@ygiraud"]` dans `manifest.json`
-- ✅ `.DS_Store` non commite (le `.gitignore` fonctionne, c'etait une fausse alerte)
-- ✅ `except Exception` -> `HomeAssistantError` dans `delivery.py`
-- ✅ `DataUpdateCoordinator` : `update_interval=None` (event-driven uniquement, plus de polling toutes les 30s)
-- ✅ `sensor.py` : migration vers `_attr_has_entity_name = True`
-- ✅ Docstrings sur `NotificationEventEngine`, `process_events_core`, `select_nearest_recipients`, `send_to_notify`
-- ✅ Extraction des handlers dans `custom_components/notification_engine/services.py` (`NotificationEngineServices`)
-- ✅ `__init__.py` reduit a ~215 lignes (setup, dashboard, config uniquement)
-- ✅ `SERVICE_SEND_INFO` centralise dans `const.py`
-- ✅ Roadmap ajoutee dans `README.md` et `README.fr.md`
-- ✅ Test ajoute pour `NotificationEventEngine.delete_event_by_key(key)`
-- ✅ Version bumpée `0.2.3` -> `1.0.0` dans `manifest.json`, `README.md`, `README.fr.md`
-- ✅ Workflow CI mis a jour : `actions/checkout@v4` -> `actions/checkout@v5` pour compatibilite Node 24
-- ✅ Workflow CI mis a jour : `actions/setup-python@v5` -> `actions/setup-python@v6` pour compatibilite Node 24
+- ✅ All v1.0.0 features shipped (see previous HANDOFF entries)
+- ✅ Commit + tag v1.0.0 done by user
+- ✅ Roadmap updated: snooze moved from v1.2 -> v1.1
+- ✅ AGENTS.md updated: GitHub issue closing convention + v1.1 feature table
 
-### Verification realisee
+### v1.1 - In progress
 
-- ✅ Validation ciblee de `delete_event_by_key` executee en Python pur sur `event_engine.py`
-- 🟡 `pytest` indisponible dans l'environnement (`No module named pytest`)
-- 🟡 La suite `tests/test_event_engine.py` reste non executable ici sans dependances de dev, car `delivery.py` importe `homeassistant`
+5 features tracked for implementation:
 
-### Ce qui reste avant release
-
-- Verifier la suite de tests dans un environnement avec `pytest` + dependances dev
-- Commit, tag `v1.0.0`, push et release HACS par l'utilisateur
+| # | Feature | GitHub Issue | Status |
+|---|---|---|---|
+| 1 | Event TTL | #1 | completed |
+| 2 | Re-notification | #2 | pending |
+| 3 | `purge_events` filters | #3 | pending |
+| 4 | `get_event` service | #4 | pending |
+| 5 | `snooze` action | #5 | pending |
 
 ---
 
 ## Decisions actives
 
-- Contrat de reponse JSON `{"ok": true/false, ...}` : IMMUABLE. Toutes les automations utilisateurs en dependent.
-- `pytest-homeassistant-custom-component` : REPORTE. Trop lourd pour ce projet a ce stade.
+- Contrat de reponse JSON `{"ok": true/false, ...}` : IMMUABLE.
 - Tests : Python pur uniquement (pas de dependance HA dans les tests).
-- `ack_event` et `cleanup_events` : methodes internes conservees dans `event_engine.py` (les services publics sont supprimes depuis 0.2.0).
+- `pytest-homeassistant-custom-component` : REPORTE. Trop lourd pour ce projet.
 - `alert` bypass DND : iOS critical + Android `alarm_stream`. Semantique "alerte = critique" sans flag supplementaire.
-- Groupes de personnes (roadmap) : ABANDONNE. Necessite une creation manuelle par l'utilisateur, pas d'interface UI dans HA pour ca.
+- `ttl_hours` est optionnel et doit etre strictement positif. Valeur invalide -> erreur de service `invalid_ttl_hours`.
+- La purge TTL s'applique uniquement aux evenements `pending` et se declenche au debut de `process_events`.
+- Les evenements expires suppriment aussi leur `tag` de notification sur les devices configures.
+- `process_events` est maintenant aussi declenche periodiquement toutes les 5 minutes pour rendre le TTL utile sans action manuelle.
+- Les notifications envoyees pour un evenement avec TTL embarquent aussi un `timeout` mobile calcule sur le TTL restant.
+- v1.1 inclut le `snooze` (deplace depuis v1.2).
+- v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
 
 ---
 
 ## Risques ouverts
 
-- 🟡 `_attr_has_entity_name = True` sur `sensor.py` : non verifie sur instance HA reelle. Le nom attendu est "Notification Engine Events" via `translation_key = "events"`. A tester apres reload de l'integration.
-- 🟡 `alert` : payload critique verifie via test unitaire, pas sur device iOS/Android reel. Comportement final dependant des permissions companion app et de la config du canal `alarm_stream` Android.
+- 🟡 `_attr_has_entity_name = True` sur `sensor.py` : non verifie sur instance HA reelle.
+- 🟡 `alert` payload critique : verifie par test unitaire uniquement, pas sur device iOS/Android reel.
+- ✅ Purge TTL et cleanup mobile verifies sur instance HA apres ajout du `timeout` et du traitement periodique.
+- 🟡 `snooze` : necessite un mobile action handler dedie. Architecture a confirmer avant implementation (cf. AGENTS.md Per-Feature Checklist).
 
 ---
 
-## Structure des fichiers modifies recemment
+## Structure des fichiers cles
 
 ```
 custom_components/notification_engine/
-  __init__.py        # Setup, dashboard, config uniquement (~215 lignes)
-  services.py        # NOUVEAU - NotificationEngineServices (handlers services + listeners)
-  delivery.py        # Livraison, HomeAssistantError, docstrings
-  event_engine.py    # Moteur pur, delete_event_by_key(), docstring classe
+  __init__.py        # Setup, dashboard, config
+  services.py        # NotificationEngineServices (handlers + listeners)
+  delivery.py        # Livraison, HomeAssistantError
+  event_engine.py    # Moteur pur (TTL, re-notification, snooze iront ici)
   sensor.py          # _attr_has_entity_name = True
-  const.py           # SERVICE_SEND_INFO centralise ici
+  const.py           # Constantes centralisees
+  services.yaml      # Definitions des services HA
+  strings.json       # Chaines UI (source)
+  translations/
+    en.json
+    fr.json
 tests/
-  test_event_engine.py  # test delete_event_by_key ajoute
-README.md / README.fr.md  # Roadmap ajoutee, services mis a jour
+  test_event_engine.py
 ```
+
+---
+
+## Completed Work
+
+- Ajout du champ optionnel `ttl_hours` sur `create_event` avec validation stricte (> 0).
+- Persistance de `ttl_hours` dans `event_engine.py` et prise en compte dans la deduplication.
+- Ajout de `purge_expired_events()` et purge automatique au debut de `process_events`.
+- Nettoyage des tags de notification pour les evenements expires.
+- Ajout d'un declenchement periodique de `process_events` toutes les 5 minutes.
+- Ajout d'un `timeout` mobile calcule a partir du TTL restant pour auto-effacer les notifications cote telephone.
+- Documentation service mise a jour dans `services.yaml`.
+- Tests unitaires ajoutes pour stockage TTL, validation, purge selective, timeout mobile et integration dans `process_events`.
+- Validation manuelle reussie sur instance HA : creation avec `ttl_hours`, expiration, suppression de l'evenement et disparition de la notification mobile.
+
+---
+
+## Modified Files
+
+- `custom_components/notification_engine/event_engine.py`
+- `custom_components/notification_engine/services.py`
+- `custom_components/notification_engine/delivery.py`
+- `custom_components/notification_engine/__init__.py`
+- `custom_components/notification_engine/const.py`
+- `custom_components/notification_engine/services.yaml`
+- `tests/test_event_engine.py`
+- `HANDOFF.md`
 
 ---
 
 ## Next Steps
 
-1. Utilisateur : verifier la suite de tests dans un environnement equipe de `pytest` et des dependances Home Assistant
-2. Utilisateur : verifier `_attr_has_entity_name = True` sur instance HA reelle
-3. Utilisateur : commit + tag `v1.0.0` + release HACS
+1. Utilisateur : valider le commit final de la feature #1 (`Closes #1`)
+2. Claude : relire l'implementation TTL si une revue croisee est souhaitee
+3. Codex : passer ensuite a la feature #2 (Re-notification) dans une session separee

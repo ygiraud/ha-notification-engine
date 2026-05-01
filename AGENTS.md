@@ -179,13 +179,22 @@ Claude must:
 
 ### Format
 
-text <type>[optional scope]: <imperative description>  - <technical change> - <technical change> 
+```
+<type>[optional scope]: <imperative description>
+
+- <technical change>
+- <technical change>
+
+Closes #N
+```
 
 ### Rules
 
 - English, imperative, no trailing period
 - No vague messages
 - One commit = one intention
+- Always append `Closes #N` (GitHub issue number) when the commit fully resolves a tracked issue
+- GitHub keywords accepted: `Closes`, `Fixes`, `Resolves` — use `Closes` by default
 
 ### Process
 
@@ -203,6 +212,45 @@ text <type>[optional scope]: <imperative description>  - <technical change> - <t
 - No destructive git commands
 - Refuse incoherent commits
 - Do not include AGENTS.md / HANDOFF.md unless relevant
+
+---
+
+## v1.1 Features
+
+Work is done feature by feature. Each feature maps to a GitHub issue.
+Implement one feature per working session. Close the issue in the commit message with `Closes #N`.
+
+| # | Feature | GitHub Issue | Status |
+|---|---|---|---|
+| 1 | Event TTL (`ttl_hours` on `create_event`, auto-purge on `process_events`) | #1 | completed |
+| 2 | Re-notification (resend unacknowledged `asap` after configurable delay) | #2 | pending |
+| 3 | `purge_events` filters (`strategy`, `status`, `older_than_hours`) | #3 | pending |
+| 4 | `get_event` service (retrieve single event by `key` or `id`) | #4 | pending |
+| 5 | `snooze` action (defer event N minutes from mobile notification) | #5 | pending |
+
+### Implementation Order
+
+Implement in issue number order. Each feature is independent enough to be done in isolation.
+
+1. Event TTL (#1) — adds `ttl_hours` field + auto-purge in `process_events`
+2. Re-notification (#2) — new scheduling logic for unacknowledged `asap` events
+3. `purge_events` filters (#3) — extends existing service with filter params
+4. `get_event` service (#4) — pure read-only service, no side effects
+5. `snooze` action (#5) — mobile action handler, defers event N minutes
+
+### Per-Feature Checklist
+
+Before starting a feature, Codex must:
+- Read AGENTS.md and HANDOFF.md
+- Identify all files affected
+- Confirm the implementation plan with the user if ambiguous
+
+After completing a feature, Codex must:
+- Add or update unit tests
+- Update `services.yaml` if a new service or field is added
+- Update `strings.json` + `translations/en.json` + `translations/fr.json` if UI strings change
+- Update HANDOFF.md
+- Propose a commit message following the format above (including `Closes #N`)
 
 ---
 

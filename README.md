@@ -109,6 +109,13 @@
 | `notification_engine.delete_event` | Delete an event by key or internal id |
 | `notification_engine.purge_events` | Delete all events |
 
+### `create_event` notable fields
+
+- `key`: logical event key used for idempotent deduplication
+- `strategy`: delivery behavior (`present`, `asap`, `away_reminder`, `alert`, `info`)
+- `actions`: optional JSON array of mobile actions
+- `ttl_hours`: optional positive number; expired pending events are purged automatically during `process_events`
+
 **Response contract:**
 
 ```yaml
@@ -253,6 +260,34 @@ automation:
 
 ---
 
+### Event TTL — Auto-expire stale pending events
+
+Use `ttl_hours` when an event should become irrelevant after a delay.
+
+```yaml
+automation:
+  alias: "Reminder: move laundry within 6 hours"
+  trigger:
+    - platform: state
+      entity_id: sensor.washing_machine
+      to: "done"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id: person.alice
+      data:
+        key: laundry_move
+        strategy: asap
+        title: "🧺 Move laundry"
+        message: "The washing machine finished. Move the laundry before it sits too long."
+        ttl_hours: 6
+        actions: '[{"action":"DONE","title":"✅ Done"}]'
+```
+
+If the event is still pending after 6 hours, it is removed automatically the next time `notification_engine.process_events` runs.
+
+---
+
 ### Delete or purge events
 
 ```yaml
@@ -348,12 +383,12 @@ tests/
 
 ### v1.1.0
 
-- **Event TTL** — optional `ttl_hours` field on `create_event`; expired events are automatically removed during `process_events`
+- ✅ **Event TTL** — optional `ttl_hours` field on `create_event`; expired events are automatically removed during `process_events`
 - **Re-notification** — resend an unacknowledged `asap` event after a configurable delay
 - **`purge_events` filters** — filter by strategy, status, or age (`older_than_hours`)
 - **`get_event` service** — retrieve a single event by `key` or `id`, useful for template conditions in automations
+- **`snooze` action** — defer an event by N minutes from the mobile notification, without dismissing it
 
 ### v1.2.0
 
-- **`snooze` action** — defer an event by N minutes from the mobile notification, without dismissing it
 - **Alternative notify targets** — support notify services beyond `mobile_app_*` (Pushover, Telegram, etc.)

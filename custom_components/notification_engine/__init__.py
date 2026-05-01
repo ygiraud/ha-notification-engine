@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import voluptuous as vol
 
@@ -22,6 +23,7 @@ from .const import (
     DEFAULT_AWAY_REMINDER_MODE,
     DEFAULT_AWAY_REMINDER_TOLERANCE_M,
     DEFAULT_INSTALL_DASHBOARD,
+    DEFAULT_PROCESS_EVENTS_INTERVAL,
     DOMAIN,
     EVENTS_FILENAME,
     SERVICE_CREATE_EVENT,
@@ -33,6 +35,7 @@ from .const import (
 )
 from .event_engine import NotificationEventEngine
 from .services import NotificationEngineServices
+from .delivery import process_events_core
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -229,6 +232,19 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.services.async_register(DOMAIN, SERVICE_PROCESS_EVENTS, handler.async_process_events, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_DELETE_EVENT, handler.async_delete_event, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_PURGE_EVENTS, handler.async_purge_events, supports_response=SupportsResponse.OPTIONAL)
+
+    async def _async_periodic_process_events(now: Any) -> None:
+        try:
+            await process_events_core(hass, domain_data)
+            await coordinator.async_request_refresh()
+        except Exception:  # pragma: no cover - defensive HA runtime logging
+            _LOGGER.exception("Periodic process_events execution failed")
+
+    domain_data["periodic_process_events_unsub"] = async_track_time_interval(
+        hass,
+        _async_periodic_process_events,
+        DEFAULT_PROCESS_EVENTS_INTERVAL,
+    )
 
     domain_data["services_registered"] = True
     return True

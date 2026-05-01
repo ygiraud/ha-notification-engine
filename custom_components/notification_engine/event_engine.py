@@ -16,6 +16,49 @@ def utc_now_iso() -> str:
     """Return current UTC time as ISO string."""
     return datetime.now(timezone.utc).isoformat()
 
+
+def parse_created_at(value: Any) -> datetime | None:
+    """Parse one stored event creation timestamp."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def normalize_ttl_hours(value: Any) -> float | None:
+    """Normalize ttl_hours to a positive float or None."""
+    if value in (None, ""):
+        return None
+    try:
+        ttl_hours = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("ttl_hours must be a positive number") from None
+    if ttl_hours <= 0:
+        raise ValueError("ttl_hours must be a positive number")
+    return ttl_hours
+
+
+def ttl_remaining_seconds(
+    created_at: Any,
+    ttl_hours: Any,
+    now: datetime | None = None,
+) -> int | None:
+    """Return remaining TTL in whole seconds for one event."""
+    normalized_ttl_hours = normalize_ttl_hours(ttl_hours)
+    if normalized_ttl_hours is None:
+        return None
+    parsed_created_at = parse_created_at(created_at)
+    if parsed_created_at is None:
+        return None
+    current_time = now or datetime.now(timezone.utc)
+    expires_at = parsed_created_at.timestamp() + (normalized_ttl_hours * 3600)
+    return max(0, int(expires_at - current_time.timestamp()))
+
 def parse_actions(value: Any) -> list[dict[str, str]]:
     """Parse actions from list/dict-like inputs, JSON or Python literal strings."""
 
@@ -94,6 +137,7 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(resolved_recipients, list):
         resolved_recipients = []
     normalized["resolved_recipients"] = [str(person) for person in resolved_recipients if str(person)]
+    normalized["ttl_hours"] = normalize_ttl_hours(normalized.get("ttl_hours"))
     return normalized
 
 
@@ -107,6 +151,7 @@ def make_event(
     title: str = "",
     message: str = "",
     actions: list[dict[str, str]] | None = None,
+    ttl_hours: float | None = None,
 ) -> dict[str, Any]:
     """Create a new normalized pending event."""
     event_id = f"evt_{int(time.time())}_{uuid.uuid4().hex[:8]}"
@@ -127,6 +172,7 @@ def make_event(
             "recipients": recipients or [],
             "resolved_recipients": resolved_recipients or [],
             "actions": actions or [],
+            "ttl_hours": ttl_hours,
             "notified_people": [],
             "history": [{"at": now, "action": "created"}],
         }
@@ -194,10 +240,12 @@ class NotificationEventEngine:
         title: str = "",
         message: str = "",
         actions: list[dict[str, str]] | None = None,
+        ttl_hours: float | None = None,
     ) -> dict[str, Any]:
         """Create event with idempotent deduplication."""
         recipient_list = recipients or []
         action_list = actions or []
+        normalized_ttl_hours = normalize_ttl_hours(ttl_hours)
         events = self.load_events()
 
         for event in events:
@@ -211,6 +259,7 @@ class NotificationEventEngine:
                 and event.get("title", "") == title
                 and event.get("message", "") == message
                 and event.get("actions", []) == action_list
+                and event.get("ttl_hours") == normalized_ttl_hours
             ):
                 return {"created": False, "event": event}
 
@@ -224,10 +273,36 @@ class NotificationEventEngine:
             title=title,
             message=message,
             actions=action_list,
+            ttl_hours=normalized_ttl_hours,
         )
         events.append(event)
         self.save_events(events)
         return {"created": True, "event": event}
+
+    def purge_expired_events(self, now: datetime | None = None) -> dict[str, Any]:
+        """Delete pending events whose ttl_hours has elapsed."""
+        current_time = now or datetime.now(timezone.utc)
+        events = self.load_events()
+        kept: list[dict[str, Any]] = []
+        expired: list[dict[str, Any]] = []
+
+        for event in events:
+            ttl_hours = event.get("ttl_hours")
+            created_at = parse_created_at(event.get("created_at"))
+            if (
+                event.get("status") == "pending"
+                and ttl_hours is not None
+                and created_at is not None
+                and created_at.timestamp() + (float(ttl_hours) * 3600) <= current_time.timestamp()
+            ):
+                expired.append(event)
+                continue
+            kept.append(event)
+
+        if expired:
+            self.save_events(kept)
+
+        return {"expired": expired, "remaining": len(kept)}
 
     def ack_event(self, event_id: str, status: str = "done") -> dict[str, Any] | None:
         """Mark one event with a status."""

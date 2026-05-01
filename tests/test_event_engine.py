@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
 from pathlib import Path
@@ -108,9 +109,11 @@ SERVICES_MODULE = _load_module(
 NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
+process_events_core = DELIVERY_MODULE.process_events_core
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
 send_to_notify = DELIVERY_MODULE.send_to_notify
 extract_target_entities = SERVICES_MODULE._extract_target_entities
+ttl_remaining_seconds = EVENT_ENGINE_MODULE.ttl_remaining_seconds
 
 
 def test_parse_actions_accepts_json_and_python_literal() -> None:
@@ -158,6 +161,21 @@ def test_build_mobile_actions_maps_done_and_custom_actions() -> None:
         {"action": "NOTIF_EVENT_DONE_evt_123", "title": "Done"},
         {"action": "NOTIF_CUSTOM_evt_123_1", "title": "Open"},
     ]
+
+
+def test_ttl_remaining_seconds_returns_zero_once_expired() -> None:
+    now = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+
+    assert ttl_remaining_seconds(
+        "2026-05-02T06:00:00+00:00",
+        2,
+        now,
+    ) == 3600
+    assert ttl_remaining_seconds(
+        "2026-05-02T06:00:00+00:00",
+        1,
+        now,
+    ) == 0
 
 
 def test_select_nearest_recipients_uses_tolerance_and_fallback() -> None:
@@ -236,6 +254,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
             tag="alert-tag",
             actions=[],
             strategy="alert",
+            timeout_seconds=45,
         )
     )
     asyncio.run(
@@ -247,6 +266,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
             tag="info-tag",
             actions=[],
             strategy="info",
+            timeout_seconds=None,
         )
     )
 
@@ -254,6 +274,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
     info_payload = hass.services.calls[1][2]
 
     assert alert_payload["data"]["ttl"] == 0
+    assert alert_payload["data"]["timeout"] == 45
     assert alert_payload["data"]["priority"] == "high"
     assert alert_payload["data"]["channel"] == "alarm_stream"
     assert alert_payload["data"]["push"] == {
@@ -311,6 +332,30 @@ def test_create_event_recreates_after_deletion(tmp_path) -> None:
     assert deleted is not None
     assert recreated["created"] is True
     assert recreated["event"]["id"] != event_id
+
+
+def test_create_event_stores_ttl_hours_and_deduplicates_on_it(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    first = engine.create_event(key="door", title="Door", message="Open", ttl_hours=2)
+    duplicate = engine.create_event(key="door", title="Door", message="Open", ttl_hours=2)
+    distinct = engine.create_event(key="door", title="Door", message="Open", ttl_hours=3)
+
+    assert first["event"]["ttl_hours"] == 2.0
+    assert duplicate["created"] is False
+    assert distinct["created"] is True
+    assert len(engine.load_events()) == 2
+
+
+def test_create_event_rejects_non_positive_ttl_hours(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    try:
+        engine.create_event(key="door", title="Door", message="Open", ttl_hours=0)
+    except ValueError as exc:
+        assert str(exc) == "ttl_hours must be a positive number"
+    else:
+        raise AssertionError("Expected ValueError for ttl_hours=0")
 
 
 def test_delete_event_by_key_deletes_first_pending_match_only(tmp_path) -> None:
@@ -386,3 +431,167 @@ def test_purge_events_clears_all_events(tmp_path) -> None:
 
     assert result == {"purged": True, "remaining": 0}
     assert engine.load_events() == []
+
+
+def test_purge_expired_events_removes_only_elapsed_pending_events(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    expired = engine.create_event(key="expired", title="Expired", message="Old", ttl_hours=1)["event"]
+    fresh = engine.create_event(key="fresh", title="Fresh", message="New", ttl_hours=4)["event"]
+    no_ttl = engine.create_event(key="no-ttl", title="No TTL", message="Keep")["event"]
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == expired["id"]:
+            event["created_at"] = (now - timedelta(hours=2)).isoformat()
+        elif event["id"] == fresh["id"]:
+            event["created_at"] = (now - timedelta(minutes=30)).isoformat()
+    engine.save_events(events)
+
+    result = engine.purge_expired_events(now)
+
+    assert [event["id"] for event in result["expired"]] == [expired["id"]]
+    assert [event["id"] for event in engine.load_events()] == [fresh["id"], no_ttl["id"]]
+
+
+def test_process_events_core_purges_expired_events_and_clears_tags(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    expired = engine.create_event(
+        key="expired",
+        title="Expired",
+        message="Old",
+        recipients=["person.alice"],
+        ttl_hours=1,
+    )["event"]
+    active = engine.create_event(
+        key="active",
+        title="Active",
+        message="Current",
+        recipients=["person.alice"],
+    )["event"]
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == expired["id"]:
+            event["created_at"] = (now - timedelta(hours=2)).isoformat()
+    engine.save_events(events)
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    result = asyncio.run(process_events_core(hass, domain_data))
+
+    assert result == {"ok": True, "sent": 0}
+    assert [event["id"] for event in engine.load_events()] == [active["id"]]
+    assert hass.services.calls == [
+        (
+            "notify",
+            "mobile_app_alice",
+            {"message": "clear_notification", "data": {"tag": expired["tag"]}},
+            True,
+        )
+    ]
+
+
+def test_process_events_core_sets_mobile_timeout_from_remaining_ttl(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="ttl-send",
+        strategy="alert",
+        title="TTL send",
+        message="Short-lived",
+        recipients=["person.alice"],
+        ttl_hours=1,
+    )["event"]
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == created["id"]:
+            event["created_at"] = (now - timedelta(minutes=30)).isoformat()
+    engine.save_events(events)
+
+    class _State:
+        def __init__(self, state: str) -> None:
+            self.state = state
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            if entity_id == "person.alice":
+                return _State("home")
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    result = asyncio.run(process_events_core(hass, domain_data))
+
+    assert result == {"ok": True, "sent": 1}
+    notify_payload = hass.services.calls[0][2]
+    assert notify_payload["data"]["timeout"] > 1700
+    assert notify_payload["data"]["timeout"] <= 1800

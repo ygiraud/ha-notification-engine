@@ -1,5 +1,7 @@
 """Constants for the Notification Engine integration."""
 
+from datetime import timedelta
+
 DOMAIN = "notification_engine"
 EVENTS_FILENAME = "notification_engine_events.json"
 
@@ -22,3 +24,4 @@ DEFAULT_AWAY_REMINDER_MODE = "all"
 DEFAULT_AWAY_REMINDER_TOLERANCE_M = 1000.0
 DEFAULT_AWAY_REMINDER_MAX_DISTANCE_M = 10000.0
 DEFAULT_INSTALL_DASHBOARD = False
+DEFAULT_PROCESS_EVENTS_INTERVAL = timedelta(minutes=5)

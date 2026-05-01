@@ -22,6 +22,19 @@ from .event_engine import NotificationEventEngine, parse_actions
 _LOGGER = logging.getLogger(__name__)
 
 
+def _parse_ttl_hours(value: Any) -> float | None:
+    """Validate optional ttl_hours from service payload."""
+    if value in (None, ""):
+        return None
+    try:
+        ttl_hours = float(value)
+    except (TypeError, ValueError):
+        return None
+    if ttl_hours <= 0:
+        return None
+    return ttl_hours
+
+
 def _normalize_entities(value: Any) -> list[str]:
     """Normalize entity inputs from service data or stored events.
 
@@ -100,6 +113,9 @@ class NotificationEngineServices:
 
     async def async_create_event(self, call: ServiceCall) -> ServiceResponse:
         """Create a notification event and trigger immediate delivery."""
+        ttl_hours = _parse_ttl_hours(call.data.get("ttl_hours"))
+        if call.data.get("ttl_hours") not in (None, "") and ttl_hours is None:
+            return {"ok": False, "error": "invalid_ttl_hours"}
         explicit_recipients = _extract_target_entities(call)
         resolved_recipients = event_recipients(
             {"recipients": explicit_recipients}, people_config(self._domain_data)
@@ -115,6 +131,7 @@ class NotificationEngineServices:
             str(call.data.get("title", "")),
             str(call.data.get("message", "")),
             parse_actions(call.data.get("actions", [])),
+            ttl_hours,
         )
         await process_events_core(self._hass, self._domain_data)
         await self._coordinator.async_request_refresh()
