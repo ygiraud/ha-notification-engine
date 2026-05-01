@@ -33,6 +33,7 @@ Finaliser la v1.0.0 et preparer le commit/tag utilisateur.
 - ✅ Roadmap ajoutee dans `README.md` et `README.fr.md`
 - ✅ Test ajoute pour `NotificationEventEngine.delete_event_by_key(key)`
 - ✅ Version bumpée `0.2.3` -> `1.0.0` dans `manifest.json`, `README.md`, `README.fr.md`
+- ✅ Workflow CI mis a jour : `actions/checkout@v4` -> `actions/checkout@v5` pour compatibilite Node 24
 
 ### Verification realisee
 
