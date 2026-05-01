@@ -1,139 +1,346 @@
-# Home Assistant Notification Engine
+<div align="center">
 
-Moteur de notifications push pour Home Assistant, avec persistance d'événements et stratégies de diffusion.
+# 🔔 Home Assistant Notification Engine
 
-Version anglaise: [README.md](README.md)
+**Moteur de notifications push pour Home Assistant — événements persistants, stratégies de diffusion intelligentes et bypass DND mobile.**
 
-## Fonctionnalités
+[![CI](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
+[![HACS Validation](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=HACS+Validation)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
+[![Hassfest](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=Hassfest)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Version](https://img.shields.io/badge/version-0.2.3-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- Services `notification_engine.*` pour créer, traiter, supprimer et purger des événements
-- Persistance des événements dans `.storage/notification_engine_events.json`
-- Stratégies de diffusion:
-  - `present`
-  - `asap`
-  - `away_reminder`
-  - `alert`
-  - `info`
-- Gestion des actions mobiles (`DONE` et actions custom) dans l'intégration
-- Dashboard Lovelace YAML installable/synchronisable depuis les options de l'intégration
+🇬🇧 [English version](README.md)
 
-## Structure du dépôt
+</div>
+
+---
+
+## 📋 Table des matières
+
+- [Fonctionnalités](#-fonctionnalités)
+- [Prérequis](#-prérequis)
+- [Installation](#-installation)
+- [Stratégies de diffusion](#-stratégies-de-diffusion)
+- [Services disponibles](#-services-disponibles)
+- [Exemples d'automatisations](#-exemples-dautomatisations)
+- [Dashboard Lovelace](#-dashboard-lovelace)
+- [Comportement DND mobile](#-comportement-dnd-mobile)
+- [Dépannage](#-dépannage)
+- [Structure du dépôt](#-structure-du-dépôt)
+
+---
+
+## ✨ Fonctionnalités
+
+- **Événements persistants** stockés dans `.storage/notification_engine_events.json` — survivent aux redémarrages
+- **5 stratégies de diffusion** adaptées à la présence, la distance et l'urgence
+- **Déduplication idempotente** via des clés d'événement — créer deux fois le même événement n'envoie qu'une notification
+- **Gestion des actions mobiles** (`DONE` et actions custom) directement dans l'intégration
+- **Dashboard Lovelace** installable et synchronisable depuis les options de l'intégration
+- **Bilingue** — interface disponible en français et en anglais
+
+---
+
+## 📦 Prérequis
+
+| Prérequis | Détails |
+|---|---|
+| Home Assistant | Avec mobile app configurée (`notify.mobile_app_*`) |
+| Capteurs de distance | Requis par personne pour la stratégie `away_reminder` (`proximity_sensor`) |
+| `auto-entities` | Pour le dashboard Lovelace inclus |
+| `mushroom` | Pour le dashboard Lovelace inclus |
+| `button-card` | Pour le dashboard Lovelace inclus |
+
+---
+
+## 🚀 Installation
+
+### Via HACS (recommandé)
+
+1. Dans HACS, aller dans **Intégrations** → ⋮ → **Dépôts personnalisés**
+2. Ajouter `https://github.com/ygiraud/ha-notification-engine` avec la catégorie **Intégration**
+3. Cliquer sur **Télécharger**
+4. Redémarrer Home Assistant
+
+### Manuel
+
+1. Copier `custom_components/notification_engine/` dans le dossier `/config/custom_components/`
+2. Redémarrer Home Assistant
+
+### Configuration initiale
+
+1. Aller dans **Paramètres → Appareils et services → Ajouter une intégration** → chercher `Notification Engine`
+2. Configurer les personnes (nom, entité `person.*`, `notify_service`, `proximity_sensor`)
+3. _(Optionnel)_ Activer **Installer le dashboard dans la barre latérale** pour synchroniser le dashboard Lovelace
+
+---
+
+## 📬 Stratégies de diffusion
+
+| Stratégie | Quand l'utiliser | Comportement |
+|---|---|---|
+| `present` | Info contextuelle pour les personnes à la maison | Envoi uniquement si la personne est actuellement à `home` |
+| `asap` | Tâches à faire au retour à la maison | Envoi immédiat si `home`, sinon au prochain retour |
+| `away_reminder` | Déléguer une tâche à la personne la plus proche | Basé sur la distance : envoie au plus proche ou à tous, avec tolérance configurable |
+| `alert` | 🚨 Urgent — action immédiate requise | Envoi immédiat à tous, bypass DND/Focus mobile |
+| `info` | Notifications éphémères | Envoi immédiat à tous, puis suppression automatique après diffusion |
+
+### Modes `away_reminder`
+
+| Mode | Comportement |
+|---|---|
+| `all` | Envoie à toutes les personnes ciblées |
+| `nearest` | Envoie à la/aux personne(s) la/les plus proche(s) selon `away_reminder_tolerance_m` et `away_reminder_max_distance_m` |
+
+> **Fallback :** si aucun capteur de distance valide n'est disponible (absent, valeur non numérique), l'intégration retombe sur un envoi à toutes les personnes ciblées.
+
+---
+
+## 🛠 Services disponibles
+
+| Service | Description |
+|---|---|
+| `notification_engine.create_event` | Créer un événement de notification (idempotent) |
+| `notification_engine.list_events` | Lister tous les événements en attente |
+| `notification_engine.send_info` | Envoyer une notification info éphémère |
+| `notification_engine.process_events` | Déclencher manuellement le traitement des événements |
+| `notification_engine.notify_person` | Envoyer une notification directement à une personne |
+| `notification_engine.delete_event` | Supprimer un événement par clé |
+| `notification_engine.purge_events` | Supprimer tous les événements correspondant à des filtres optionnels |
+
+**Contrat de réponse :**
+
+```yaml
+# Succès
+{"ok": true, ...}
+
+# Erreur
+{"ok": false, "error": "..."}
+```
+
+---
+
+## 💡 Exemples d'automatisations
+
+### `present` — Envoyer uniquement si la personne est à la maison
+
+Utile pour les rappels contextuels (ex. linge terminé, lumières oubliées).
+
+```yaml
+automation:
+  alias: "Notif: machine à laver terminée (present)"
+  trigger:
+    - platform: state
+      entity_id: sensor.lave_linge
+      to: "done"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id: person.alice
+      data:
+        key: lave_linge_termine
+        strategy: present
+        title: "🫧 Linge terminé"
+        message: "La machine a fini. N'oublie pas d'étendre !"
+        actions: '[{"action":"DONE","title":"✅ Fait"}]'
+```
+
+---
+
+### `asap` — Envoyer au prochain retour à la maison
+
+Utile pour les tâches à effectuer dès l'arrivée.
+
+```yaml
+automation:
+  alias: "Notif: colis reçu — à ramasser"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.sonnette_colis
+      to: "on"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id:
+          - person.alice
+          - person.bob
+      data:
+        key: colis_a_ramasser
+        strategy: asap
+        title: "📦 Colis livré"
+        message: "Un colis est arrivé. Pense à le rentrer."
+        actions: '[{"action":"DONE","title":"✅ Récupéré"}]'
+```
+
+---
+
+### `away_reminder` — Notifier la personne la plus proche
+
+Utile pour déléguer une tâche à celui qui est le plus proche (ex. courses, récupérer les enfants).
+
+```yaml
+automation:
+  alias: "Notif: acheter du pain (personne la plus proche)"
+  trigger:
+    - platform: time
+      at: "17:00:00"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id:
+          - person.alice
+          - person.bob
+      data:
+        key: acheter_pain
+        strategy: away_reminder
+        title: "🥖 Acheter du pain"
+        message: "N'oublie pas de prendre du pain en rentrant."
+        actions: '[{"action":"DONE","title":"✅ Pris"}]'
+```
+
+---
+
+### `alert` — Urgent / bypass DND
+
+À utiliser avec parcimonie — traverse le mode Focus/Ne pas déranger sur iOS et Android.
+
+```yaml
+automation:
+  alias: "Alerte: fuite d'eau détectée"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.detecteur_fuite_cuisine
+      to: "on"
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id:
+          - person.alice
+          - person.bob
+      data:
+        key: fuite_eau_cuisine
+        strategy: alert
+        title: "🚨 Fuite d'eau !"
+        message: "Une fuite a été détectée dans la cuisine. Action immédiate requise."
+        actions: '[{"action":"DONE","title":"✅ Géré"}]'
+```
+
+---
+
+### `info` — Notification éphémère (supprimée automatiquement)
+
+Utile pour les mises à jour de statut ponctuelles qui ne nécessitent pas d'accusé de réception.
+
+```yaml
+automation:
+  alias: "Info: Home Assistant redémarré"
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - service: notification_engine.create_event
+      target:
+        entity_id:
+          - person.alice
+          - person.bob
+      data:
+        key: ha_redemarrage
+        strategy: info
+        title: "🏠 Home Assistant démarré"
+        message: "Home Assistant a redémarré avec succès."
+```
+
+---
+
+### Supprimer ou purger des événements
+
+```yaml
+# Supprimer un événement spécifique
+- service: notification_engine.delete_event
+  data:
+    key: lave_linge_termine
+
+# Purger tous les événements livrés
+- service: notification_engine.purge_events
+  data:
+    status: delivered
+```
+
+---
+
+## 📊 Dashboard Lovelace
+
+Un dashboard pré-construit est inclus et peut être installé directement depuis les options de l'intégration.
+
+**Emplacement du fichier :**
+```
+custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml
+```
+
+**Entité de support** (créée automatiquement) :
+- `text.notification_engine_test_targets` — sélection multi-personnes pour les tests
+
+
+---
+
+## 📱 Comportement DND mobile
+
+| Stratégie | Android | iOS |
+|---|---|---|
+| `alert` | `ttl: 0`, `priority: high`, `channel: alarm_stream` | `interruption-level: critical` avec son critique |
+| Toutes les autres | Pas de bypass DND | Pas de bypass DND |
+
+> ⚠️ **`alert` est volontairement intrusif.** Sur iPhone, il est conçu pour traverser Focus / Ne pas déranger et produire une alerte sonore critique. Sur Android, le comportement final dépend aussi de la façon dont l'appareil gère le canal `alarm_stream` et ses paramètres système de notifications.
+>
+> Utiliser `alert` uniquement pour les situations qui exigent une action immédiate. Pour le non critique, préférer `info`, `present`, `asap` ou `away_reminder`.
+
+---
+
+## 🔧 Dépannage
+
+**Événement créé mais aucune notification envoyée ?**
+
+Vérifier les points suivants :
+- La personne existe dans `notification_engine.people`
+- `enabled: true` est configuré pour la personne
+- `notify_service` est valide et fonctionnel (tester manuellement depuis les Outils de développement)
+- Le `target` du service correspond à des entités `person.*` configurées
+
+**`away_reminder` n'utilise pas la distance ?**
+
+L'intégration retombe sur un envoi à toutes les personnes ciblées quand :
+- `proximity_sensor` n'est pas configuré pour la personne
+- L'entité capteur n'existe pas dans HA
+- L'état du capteur est non numérique
+- Aucun capteur de distance valide n'est disponible parmi les cibles
+
+---
+
+## 📁 Structure du dépôt
 
 ```text
 custom_components/
   notification_engine/
-    __init__.py
-    config_flow.py
-    const.py
-    event_engine.py
-    manifest.json
-    sensor.py
-    services.yaml
-    text.py
+    __init__.py          # Initialisation de l'intégration & enregistrement des services
+    config_flow.py       # Flux de configuration UI
+    const.py             # Constantes
+    event_engine.py      # Logique de diffusion principale
+    manifest.json        # Métadonnées de l'intégration
+    sensor.py            # Entités capteurs
+    services.yaml        # Définition des services
+    text.py              # Entités texte
     dashboards/
       notification_engine_dashboard.yaml
     translations/
       en.json
       fr.json
+tests/
+  test_event_engine.py
+.github/
+  workflows/
+    ci.yml               # CI : tests, validation HACS, Hassfest
 ```
 
-## Prérequis
-
-- Home Assistant avec mobile app configurée (`notify.mobile_app_*`)
-- Capteurs de distance configurés par personne (`proximity_sensor`) pour utiliser `away_reminder` en mode distance
-- Pour le dashboard fourni:
-  - `auto-entities`
-  - `mushroom`
-  - `button-card`
-
-## Installation
-
-1. Installer via HACS (repo custom) ou copier `custom_components/notification_engine/` dans `/config/custom_components/notification_engine/`.
-2. Redémarrer Home Assistant.
-3. Ajouter l'intégration: Paramètres > Appareils et services > Ajouter une intégration > `Notification Engine`.
-4. Configurer les personnes dans l'UI de l'intégration.
-5. Optionnel: activer `Install dashboard in sidebar` pour installer/synchroniser le dashboard YAML et l'afficher dans la barre latérale.
-
-## Services disponibles
-
-- `notification_engine.create_event`
-- `notification_engine.list_events`
-- `notification_engine.send_info`
-- `notification_engine.process_events`
-- `notification_engine.notify_person`
-- `notification_engine.delete_event`
-- `notification_engine.purge_events`
-
-Contrat de réponse des services:
-
-- succès: `{"ok": true, ...}`
-- erreur: `{"ok": false, "error": "..."}`
-
-## Dashboard Lovelace
-
-Fichier dashboard versionné:
-
-- `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml`
-
-Entité de support créée automatiquement par l'intégration:
-
-- `text.notification_engine_test_targets` (sélection multi-personnes pour les tests)
-
-Note d'usage:
-
-- Dans la carte `Destinataires de test`, cliquer sur la carte réinitialise la sélection.
-
-## Stratégies de diffusion
-
-- `present`: envoi uniquement aux personnes actuellement à `home`.
-- `asap`: envoi immédiat si la personne est `home`, sinon envoi au prochain retour à `home`.
-- `away_reminder`: logique basée sur la distance via `people.<person>.proximity_sensor`.
-  - mode `all`: envoi à toutes les personnes ciblées.
-  - mode `nearest`: envoi à la/aux personne(s) la/les plus proche(s) selon `away_reminder_tolerance_m` et `away_reminder_max_distance_m`.
-- `alert`: envoi immédiat à toutes les personnes ciblées et utilise des réglages de notification mobile critiques sur les apps compatibles.
-- `info`: envoi immédiat à toutes les personnes ciblées, puis suppression automatique de l'événement après diffusion.
-
-## Breaking changes en 0.2.0
-
-- `notification_engine.ack_event` a été supprimé.
-- `notification_engine.cleanup_events` a été supprimé au profit de `notification_engine.purge_events`.
-- Les actions mobiles `DONE` suppriment désormais directement l'événement au lieu de changer son statut.
-
-## Comportement DND mobile
-
-- `alert` ajoute les hints Android haute priorité (`ttl: 0`, `priority: high`) et utilise `channel: alarm_stream`.
-- `alert` ajoute `interruption-level: critical` avec un payload de son critique sur iOS.
-- Les autres stratégies ne demandent pas de bypass DND/Focus.
-
-Important:
-
-- `alert` est volontairement intrusif. Sur iPhone, il est conçu pour traverser Focus / Ne pas déranger et produire une alerte sonore critique.
-- Sur Android, le comportement final vis-a-vis du DND et du son depend encore de la facon dont le canal `alarm_stream` est gere par l'appareil et ses reglages systeme de notifications.
-- Utiliser `alert` uniquement pour les situations qui exigent une action immédiate. Pour le non critique, préférer `info`, `present`, `asap` ou `away_reminder`.
-
-## Dépannage
-
-Si un événement est créé mais qu'aucune notification n'est envoyée, vérifier:
-
-- la personne existe dans `notification_engine.people`
-- `enabled: true`
-- `notify_service` est valide et fonctionnel
-- le `target` du service correspond à des entités `person.*` configurées
-
-Fallback `away_reminder` quand la distance est inexploitable:
-
-- `proximity_sensor` absent
-- entité capteur absente
-- valeur capteur non numérique
-- aucun capteur de distance valide disponible parmi les cibles
-
-Dans ces cas, l'intégration retombe sur un envoi à toutes les personnes ciblées.
-
-## Hygiène du dépôt
-
-Ne pas versionner:
-
-- `.storage/notification_engine_events.json`
-- `__pycache__/`
-- `*.pyc`
-- `.DS_Store`
+> **Hygiène du dépôt** — ne pas versionner : `.storage/notification_engine_events.json`, `__pycache__/`, `*.pyc`, `.DS_Store`
