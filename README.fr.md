@@ -341,3 +341,19 @@ tests/
 ```
 
 > **Hygiène du dépôt** — ne pas versionner : `.storage/notification_engine_events.json`, `__pycache__/`, `*.pyc`, `.DS_Store`
+
+---
+
+## 🗺 Roadmap
+
+### v1.1.0
+
+- **TTL des événements** — champ optionnel `ttl_hours` sur `create_event` ; les événements expirés sont supprimés automatiquement lors du `process_events`
+- **Re-notification** — renvoi d'un événement `asap` non acquitté après un délai configurable
+- **Filtres sur `purge_events`** — filtrer par stratégie, statut ou ancienneté (`older_than_hours`)
+- **Service `get_event`** — récupérer un événement par `key` ou `id`, utile pour les conditions de templates dans les automatisations
+
+### v1.2.0
+
+- **Action `snooze`** — reporter un événement de N minutes depuis la notification mobile, sans le supprimer
+- **Cibles notify alternatives** — support des services notify au-delà de `mobile_app_*` (Pushover, Telegram, etc.)
