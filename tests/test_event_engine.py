@@ -236,6 +236,24 @@ def test_create_event_recreates_after_deletion(tmp_path) -> None:
     assert recreated["event"]["id"] != event_id
 
 
+def test_delete_event_by_key_deletes_first_pending_match_only(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    first = engine.create_event(key="door", title="Door", message="Open")["event"]
+    second = engine.create_event(key="window", title="Window", message="Open")["event"]
+    third = engine.create_event(key="door", title="Door", message="Still open")["event"]
+
+    deleted = engine.delete_event_by_key("door")
+
+    assert deleted is not None
+    assert deleted["id"] == first["id"]
+    assert [event["id"] for event in engine.load_events()] == [second["id"], third["id"]]
+
+    missing = engine.delete_event_by_key("unknown")
+
+    assert missing is None
+    assert [event["id"] for event in engine.load_events()] == [second["id"], third["id"]]
+
+
 def test_notify_person_updates_history_once(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
     created = engine.create_event(key="alarm", title="Alarm", message="Triggered")

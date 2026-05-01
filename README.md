@@ -8,7 +8,7 @@
 [![HACS Validation](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=HACS+Validation)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![Hassfest](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=Hassfest)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.2.3-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 🇫🇷 [Version française](README.fr.md)

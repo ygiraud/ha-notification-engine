@@ -2,15 +2,15 @@
 
 ## Last Agent
 
-- Name: Claude
+- Name: Codex
 - Date: 2026-05-01 Europe/Paris (UTC+2)
-- Context: Analyse complete pre-v1.0.0, corrections de bugs, refactors qualite, roadmap. Deux taches restantes pour Codex avant de tagger v1.0.0.
+- Context: Finalisation v1.0.0 cote implementation. Test manquant ajoute pour `delete_event_by_key` et version bumpée a `1.0.0`.
 
 ---
 
 ## Objective
 
-Finaliser la v1.0.0 : ajouter le test manquant sur `delete_event_by_key`, puis bumper la version.
+Finaliser la v1.0.0 et preparer le commit/tag utilisateur.
 
 ---
 
@@ -31,26 +31,19 @@ Finaliser la v1.0.0 : ajouter le test manquant sur `delete_event_by_key`, puis b
 - ✅ `__init__.py` reduit a ~215 lignes (setup, dashboard, config uniquement)
 - ✅ `SERVICE_SEND_INFO` centralise dans `const.py`
 - ✅ Roadmap ajoutee dans `README.md` et `README.fr.md`
-- ✅ 11 tests unitaires passants (modules purs, sans dependance HA)
+- ✅ Test ajoute pour `NotificationEventEngine.delete_event_by_key(key)`
+- ✅ Version bumpée `0.2.3` -> `1.0.0` dans `manifest.json`, `README.md`, `README.fr.md`
 
-### Ce qui reste pour v1.0.0
+### Verification realisee
 
-#### 1. 🔴 Test pour `delete_event_by_key`
+- ✅ Validation ciblee de `delete_event_by_key` executee en Python pur sur `event_engine.py`
+- 🟡 `pytest` indisponible dans l'environnement (`No module named pytest`)
+- 🟡 La suite `tests/test_event_engine.py` reste non executable ici sans dependances de dev, car `delivery.py` importe `homeassistant`
 
-- Fichier : `tests/test_event_engine.py`
-- Methode a tester : `NotificationEventEngine.delete_event_by_key(key)`
-- Cas a couvrir :
-  - Suppression d'un evenement pending par `key` -> retourne l'evenement supprime
-  - Cle inexistante -> retourne `None`, store inchange
-  - Plusieurs evenements pending avec la meme `key` -> seul le premier est supprime
-- Style : meme pattern que les tests existants (Python pur, `tmp_path`)
+### Ce qui reste avant release
 
-#### 2. 🔴 Bump de version 1.0.0
-
-Apres que le test passe :
-- `custom_components/notification_engine/manifest.json` : `"version": "0.2.3"` -> `"version": "1.0.0"`
-- `README.md` : badge `version-0.2.3-blue.svg` -> `version-1.0.0-blue.svg`
-- `README.fr.md` : idem
+- Verifier la suite de tests dans un environnement avec `pytest` + dependances dev
+- Commit, tag `v1.0.0`, push et release HACS par l'utilisateur
 
 ---
 
@@ -83,7 +76,7 @@ custom_components/notification_engine/
   sensor.py          # _attr_has_entity_name = True
   const.py           # SERVICE_SEND_INFO centralise ici
 tests/
-  test_event_engine.py  # 11 tests - manque delete_event_by_key
+  test_event_engine.py  # test delete_event_by_key ajoute
 README.md / README.fr.md  # Roadmap ajoutee, services mis a jour
 ```
 
@@ -91,7 +84,6 @@ README.md / README.fr.md  # Roadmap ajoutee, services mis a jour
 
 ## Next Steps
 
-1. Codex : ajouter les tests `delete_event_by_key` (voir section ci-dessus)
-2. Codex : bumper la version a 1.0.0 (manifest + badges README)
-3. Utilisateur : verifier `_attr_has_entity_name = True` sur instance HA reelle
-4. Utilisateur : commit + tag `v1.0.0` + release HACS
+1. Utilisateur : verifier la suite de tests dans un environnement equipe de `pytest` et des dependances Home Assistant
+2. Utilisateur : verifier `_attr_has_entity_name = True` sur instance HA reelle
+3. Utilisateur : commit + tag `v1.0.0` + release HACS
