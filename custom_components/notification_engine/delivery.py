@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.exceptions import HomeAssistantError
+
 from .const import (
     CONF_AWAY_REMINDER_MAX_DISTANCE_M,
     CONF_AWAY_REMINDER_MODE,
@@ -87,7 +89,21 @@ def select_nearest_recipients(
     tolerance: float,
     max_distance: float,
 ) -> list[str]:
-    """Select nearest recipients with tolerance and fallback to all candidates."""
+    """Return the subset of candidates closest to home, within tolerance.
+
+    Algorithm:
+    1. Read the proximity_sensor state (meters) for each candidate.
+    2. If no valid sensor is found among candidates, return all candidates (fallback).
+    3. If the nearest distance exceeds max_distance, return all candidates (fallback).
+    4. Otherwise return every candidate whose distance <= nearest + tolerance.
+
+    Args:
+        hass: Home Assistant instance used to read sensor states.
+        people: People config dict keyed by person entity id.
+        candidates: Person entity ids to consider.
+        tolerance: Extra meters allowed beyond the nearest distance (e.g. 500 m).
+        max_distance: Maximum distance in meters to trigger nearest-only logic.
+    """
     distances: list[tuple[str, float]] = []
     for person in candidates:
         sensor = str(people.get(person, {}).get("proximity_sensor", ""))
@@ -123,7 +139,15 @@ async def send_to_notify(
     actions: list[dict[str, Any]],
     strategy: str = "",
 ) -> None:
-    """Dispatch one notification to a Home Assistant notify service."""
+    """Dispatch one notification to a Home Assistant notify service.
+
+    Injects strategy-specific mobile payload:
+    - alert: Android alarm_stream channel + iOS critical interruption (bypasses DND).
+    - info: info icon only.
+    - Others: standard push with tag/group for deduplication.
+
+    Actions are capped at 3 (HA mobile app limit).
+    """
     parts = _service_parts(notify_service)
     if parts is None:
         return
@@ -172,7 +196,18 @@ async def clear_tag_for_all(hass: Any, people: dict[str, dict[str, Any]], tag: s
 
 
 async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[str, Any]:
-    """Deliver pending events according to their strategy and runtime config."""
+    """Deliver pending events according to their strategy and runtime config.
+
+    Iterates all pending events and sends notifications to eligible recipients:
+    - present/asap: only people currently home.
+    - alert/info: all recipients immediately.
+    - away_reminder: all recipients, or nearest-only when mode == "nearest".
+
+    Already-notified people (tracked in event["notified_people"]) are skipped.
+    info events are auto-deleted once all deliverable recipients are notified.
+
+    Returns {"ok": True, "sent": <count>}.
+    """
     engine: NotificationEventEngine = domain_data["engine"]
     people = people_config(domain_data)
     mode = str(domain_data.get(CONF_AWAY_REMINDER_MODE, DEFAULT_AWAY_REMINDER_MODE))
@@ -227,7 +262,7 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
                     actions=list(event.get("mobile_actions", [])),
                     strategy=strategy,
                 )
-            except Exception:  # noqa: BLE001
+            except HomeAssistantError:
                 _LOGGER.exception(
                     "Failed to send notification for event %s to %s via %s",
                     str(event.get("id", "")),

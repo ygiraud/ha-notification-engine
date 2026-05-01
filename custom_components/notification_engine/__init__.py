@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import ast
-from datetime import timedelta
 import logging
 from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.core import HomeAssistant, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import voluptuous as vol
@@ -31,14 +29,14 @@ from .const import (
     SERVICE_LIST_EVENTS,
     SERVICE_PROCESS_EVENTS,
     SERVICE_PURGE_EVENTS,
+    SERVICE_SEND_INFO,
 )
-from .delivery import clear_tag_for_all, event_recipients, people_config, person_enabled, process_events_core, send_to_notify
-from .event_engine import NotificationEventEngine, parse_actions
+from .event_engine import NotificationEventEngine
+from .services import NotificationEngineServices
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "text"]
-SERVICE_SEND_INFO = "send_info"
 DASHBOARD_FILENAME = "notification_engine_dashboard.yaml"
 DASHBOARD_SOURCE = "dashboards/notification_engine_dashboard.yaml"
 DASHBOARD_URL_PATH = "notification-engine"
@@ -72,46 +70,6 @@ CONFIG_SCHEMA = vol.Schema(
     },
     extra=vol.ALLOW_EXTRA,
 )
-
-
-def _normalize_entities(value: Any) -> list[str]:
-    """Normalize entity inputs from service data or stored events."""
-    if value is None:
-        return []
-
-    if isinstance(value, dict):
-        # Home Assistant service target payload often uses {"entity_id": ...}.
-        return _normalize_entities(value.get("entity_id"))
-
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw:
-            return []
-        # Support JSON/Python-list-like strings coming from UI payloads.
-        if raw.startswith("[") and raw.endswith("]"):
-            try:
-                return _normalize_entities(ast.literal_eval(raw))
-            except (ValueError, SyntaxError):
-                pass
-        return [item.strip() for item in raw.split(",") if item.strip()]
-
-    if isinstance(value, (list, tuple, set)):
-        normalized: list[str] = []
-        for item in value:
-            if isinstance(item, dict):
-                entity_id = str(item.get("entity_id", "")).strip()
-            else:
-                entity_id = str(item).strip()
-            if entity_id:
-                normalized.append(entity_id)
-        return normalized
-
-    return []
-
-
-def _extract_target_entities(data: dict[str, Any]) -> list[str]:
-    """Extract recipients from Home Assistant standard service target."""
-    return _normalize_entities(data.get("target"))
 
 
 def _entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -182,7 +140,10 @@ def _register_dashboard_panel(hass: HomeAssistant) -> None:
 
     existing = lovelace_data.dashboards.get(DASHBOARD_URL_PATH)
     if existing is not None and not _is_our_dashboard_config(existing.config):
-        _LOGGER.warning("Dashboard url_path '%s' already exists and is not managed by Notification Engine", DASHBOARD_URL_PATH)
+        _LOGGER.warning(
+            "Dashboard url_path '%s' already exists and is not managed by Notification Engine",
+            DASHBOARD_URL_PATH,
+        )
         return
 
     config = _dashboard_config()
@@ -228,6 +189,7 @@ async def _sync_dashboard(hass: HomeAssistant, cfg: dict[str, Any]) -> None:
         _LOGGER.info("Notification Engine dashboard installed at %s", hass.config.path("dashboards", DASHBOARD_FILENAME))
     _register_dashboard_panel(hass)
 
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Notification Engine and register services/listeners."""
     domain_cfg = config.get(DOMAIN, {})
@@ -237,12 +199,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     domain_data = hass.data.setdefault(DOMAIN, {})
     domain_data["engine"] = NotificationEventEngine(hass.config.path(".storage", EVENTS_FILENAME))
     engine: NotificationEventEngine = domain_data["engine"]
+
+    # update_interval=None: coordinator is event-driven only.
+    # Every service call explicitly calls async_request_refresh() — no polling needed.
     domain_data["coordinator"] = DataUpdateCoordinator(
         hass,
         logger=_LOGGER,
         name=f"{DOMAIN}_events",
         update_method=lambda: hass.async_add_executor_job(engine.load_events),
-        update_interval=timedelta(seconds=30),
+        update_interval=None,
     )
     _apply_runtime_config(domain_data, domain_cfg)
     entries = hass.config_entries.async_entries(DOMAIN)
@@ -253,161 +218,21 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return True
 
     coordinator: DataUpdateCoordinator = domain_data["coordinator"]
+    handler = NotificationEngineServices(hass, domain_data, engine, coordinator)
 
-    async def _create_event(call: ServiceCall) -> ServiceResponse:
-        explicit_recipients = _extract_target_entities(call.data)
-        resolved_recipients = event_recipients({"recipients": explicit_recipients}, people_config(domain_data))
-        result = await hass.async_add_executor_job(
-            engine.create_event,
-            str(call.data.get("key", "")),
-            str(call.data.get("source_entity", "")),
-            str(call.data.get("context_label", "")),
-            explicit_recipients,
-            resolved_recipients,
-            str(call.data.get("strategy", "")),
-            str(call.data.get("title", "")),
-            str(call.data.get("message", "")),
-            parse_actions(call.data.get("actions", [])),
-        )
-        await process_events_core(hass, domain_data)
-        await coordinator.async_request_refresh()
-        return {"ok": True, **result}
+    hass.bus.async_listen("mobile_app_notification_action", handler.async_on_mobile_action)
+    hass.bus.async_listen("state_changed", handler.async_on_state_changed)
 
-    async def _list_events(_: ServiceCall) -> ServiceResponse:
-        events = await hass.async_add_executor_job(engine.load_events)
-        return {"ok": True, "events": events}
-
-    async def _send_info(call: ServiceCall) -> ServiceResponse:
-        title = str(call.data.get("title", ""))
-        message = str(call.data.get("message", ""))
-        people = people_config(domain_data)
-        event_like = {
-            "recipients": _extract_target_entities(call.data),
-        }
-        recipients = event_recipients(event_like, people)
-        sent = 0
-        for person in recipients:
-            person_cfg = people.get(person, {})
-            if not person_enabled(person_cfg):
-                continue
-            notify_service = str(person_cfg.get("notify_service", ""))
-            if not notify_service:
-                continue
-            await send_to_notify(
-                hass,
-                notify_service,
-                title=title,
-                message=message,
-                tag=f"info_{person}",
-                actions=[],
-                strategy="info",
-            )
-            sent += 1
-        await coordinator.async_request_refresh()
-        return {"ok": True, "sent": sent}
-
-    async def _process_events(_: ServiceCall) -> ServiceResponse:
-        result = await process_events_core(hass, domain_data)
-        await coordinator.async_request_refresh()
-        return result
-
-    async def _delete_event(call: ServiceCall) -> ServiceResponse:
-        key = str(call.data.get("key", "")).strip()
-        event_id = str(call.data.get("id", "")).strip()
-        if key:
-            deleted = await hass.async_add_executor_job(engine.delete_event_by_key, key)
-            lookup = key
-        elif event_id:
-            deleted = await hass.async_add_executor_job(engine.delete_event, event_id)
-            lookup = event_id
-        else:
-            return {"ok": False, "error": "missing_key_or_id"}
-        if deleted is None:
-            return {"ok": False, "error": "event_not_found", "lookup": lookup}
-        await clear_tag_for_all(hass, people_config(domain_data), str(deleted.get("tag", f"notif_{deleted.get('id', '')}")))
-        await coordinator.async_request_refresh()
-        return {"ok": True, "deleted": True, "event": deleted}
-
-    async def _purge_events(_: ServiceCall) -> ServiceResponse:
-        events_before = await hass.async_add_executor_job(engine.load_events)
-        result = await hass.async_add_executor_job(engine.purge_events)
-        tags_to_clear = {
-            str(event.get("tag", ""))
-            for event in events_before
-            if isinstance(event, dict) and str(event.get("tag", ""))
-        }
-        for tag in tags_to_clear:
-            await clear_tag_for_all(hass, people_config(domain_data), tag)
-        await coordinator.async_request_refresh()
-        return {"ok": True, **result}
-
-    async def _on_mobile_action(event: Event) -> None:
-        action_id = str(event.data.get("action", ""))
-        if not (action_id.startswith("NOTIF_EVENT_DONE_") or action_id.startswith("NOTIF_CUSTOM_")):
-            return
-
-        if action_id.startswith("NOTIF_EVENT_DONE_"):
-            event_id = action_id.replace("NOTIF_EVENT_DONE_", "", 1)
-            event_obj = await hass.async_add_executor_job(engine.delete_event, event_id)
-            if event_obj is not None:
-                await clear_tag_for_all(hass, people_config(domain_data), str(event_obj.get("tag", f"notif_{event_id}")))
-                await coordinator.async_request_refresh()
-            return
-
-        stripped = action_id.replace("NOTIF_CUSTOM_", "", 1)
-        parts = stripped.rsplit("_", 1)
-        if len(parts) != 2:
-            return
-        event_id, index_raw = parts
-        try:
-            action_index = int(index_raw)
-        except ValueError:
-            return
-        events = await hass.async_add_executor_job(engine.load_events)
-        event_obj = next((item for item in events if str(item.get("id", "")) == event_id), None)
-        if event_obj is None:
-            return
-        actions = event_obj.get("actions", [])
-        custom = actions[action_index] if isinstance(actions, list) and len(actions) > action_index else {}
-        hass.bus.async_fire(
-            "notification_engine_custom_action",
-            {
-                "id": event_id,
-                "action": str(custom.get("action", "")),
-                "title": str(custom.get("title", "")),
-                "source_entity": str(event_obj.get("source_entity", "")),
-                "tag": str(event_obj.get("tag", f"notif_{event_id}")),
-            },
-        )
-
-    hass.bus.async_listen("mobile_app_notification_action", _on_mobile_action)
-
-    async def _on_state_changed(event: Event) -> None:
-        entity_id = str(event.data.get("entity_id", ""))
-        if not entity_id.startswith("person."):
-            return
-        people = set(people_config(domain_data).keys())
-        if entity_id not in people:
-            return
-        new_state = event.data.get("new_state")
-        old_state = event.data.get("old_state")
-        if new_state is None or new_state.state != "home":
-            return
-        if old_state is not None and old_state.state == "home":
-            return
-        await process_events_core(hass, domain_data)
-
-    hass.bus.async_listen("state_changed", _on_state_changed)
-
-    hass.services.async_register(DOMAIN, SERVICE_CREATE_EVENT, _create_event, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_LIST_EVENTS, _list_events, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_SEND_INFO, _send_info, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_PROCESS_EVENTS, _process_events, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_DELETE_EVENT, _delete_event, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_PURGE_EVENTS, _purge_events, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_CREATE_EVENT, handler.async_create_event, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_LIST_EVENTS, handler.async_list_events, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_SEND_INFO, handler.async_send_info, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_PROCESS_EVENTS, handler.async_process_events, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_DELETE_EVENT, handler.async_delete_event, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_PURGE_EVENTS, handler.async_purge_events, supports_response=SupportsResponse.OPTIONAL)
 
     domain_data["services_registered"] = True
     return True
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Notification Engine from a config entry."""

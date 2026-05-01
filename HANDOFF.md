@@ -4,7 +4,7 @@
 
 - Name: Claude
 - Date: 2026-05-01 Europe/Paris (UTC+2)
-- Context: Corrections pre-v1.0.0 : suppression du service `notify_person`, correction du bug `delete_event` (key/id), correction de la doc `purge_events`, ajout `codeowners`. Version reste en 0.2.3.
+- Context: Ameliorations pre-v1.0.0 : extraction services.py, restriction except, suppression polling coordinator, migration sensor entity name, docstrings. Version reste en 0.2.3.
 
 ---
 

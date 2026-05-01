@@ -14,9 +14,9 @@ from .const import DOMAIN
 
 
 class NotificationEventsSensor(CoordinatorEntity, SensorEntity):
-    """Expose notification events for dashboards/templates."""
+    """Expose notification events count and list for dashboards/templates."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_translation_key = "events"
     _attr_unique_id = "notification_engine_notifications_evenements"
     _attr_icon = "mdi:message-badge"

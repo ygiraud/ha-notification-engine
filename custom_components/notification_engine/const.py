@@ -10,6 +10,7 @@ SERVICE_SEND_INFO = "send_info"
 SERVICE_DELETE_EVENT = "delete_event"
 SERVICE_PURGE_EVENTS = "purge_events"
 
+
 CONF_PEOPLE = "people"
 CONF_PEOPLE_ENTITIES = "people_entities"
 CONF_AWAY_REMINDER_MODE = "away_reminder_mode"

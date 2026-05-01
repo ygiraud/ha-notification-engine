@@ -134,7 +134,22 @@ def make_event(
 
 
 class NotificationEventEngine:
-    """Persistent event engine with atomic writes."""
+    """Persistent, file-backed notification event store.
+
+    All writes are atomic: events are serialized to a temporary file then
+    renamed over the target path, so a crash mid-write never corrupts the
+    store.
+
+    The store is a JSON array of event dicts at events_path
+    (.storage/notification_engine_events.json).  Every event is normalized
+    on read via normalize_event(), which re-derives computed fields
+    (mobile_actions, resolved_recipients) so the on-disk format stays lean.
+
+    Thread-safety: methods are designed to be called from executor threads
+    (via hass.async_add_executor_job). Each call does a full read-modify-write
+    cycle; concurrent writes are therefore not safe — callers must serialize
+    access through the HA event loop.
+    """
 
     def __init__(self, events_path: str) -> None:
         self._events_path = events_path
