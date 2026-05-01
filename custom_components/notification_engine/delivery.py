@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.exceptions import HomeAssistantError
@@ -16,7 +17,7 @@ from .const import (
     DEFAULT_AWAY_REMINDER_MODE,
     DEFAULT_AWAY_REMINDER_TOLERANCE_M,
 )
-from .event_engine import NotificationEventEngine
+from .event_engine import NotificationEventEngine, ttl_remaining_seconds
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -138,6 +139,7 @@ async def send_to_notify(
     tag: str,
     actions: list[dict[str, Any]],
     strategy: str = "",
+    timeout_seconds: int | None = None,
 ) -> None:
     """Dispatch one notification to a Home Assistant notify service.
 
@@ -157,6 +159,8 @@ async def send_to_notify(
         "message": message,
         "data": {"tag": tag, "group": tag},
     }
+    if timeout_seconds is not None and timeout_seconds > 0:
+        payload["data"]["timeout"] = timeout_seconds
     if strategy == "info":
         payload["data"]["icon"] = "mdi:information"
     elif strategy == "alert":
@@ -213,6 +217,13 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
     mode = str(domain_data.get(CONF_AWAY_REMINDER_MODE, DEFAULT_AWAY_REMINDER_MODE))
     tolerance = float(domain_data.get(CONF_AWAY_REMINDER_TOLERANCE_M, DEFAULT_AWAY_REMINDER_TOLERANCE_M))
     max_distance = float(domain_data.get(CONF_AWAY_REMINDER_MAX_DISTANCE_M, DEFAULT_AWAY_REMINDER_MAX_DISTANCE_M))
+    now = datetime.now(timezone.utc)
+
+    expired_result = await hass.async_add_executor_job(engine.purge_expired_events)
+    for event in expired_result["expired"]:
+        tag = str(event.get("tag", ""))
+        if tag:
+            await clear_tag_for_all(hass, people, tag)
 
     events = await hass.async_add_executor_job(engine.load_events)
     sent = 0
@@ -224,6 +235,11 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
         recipients = event_recipients(event, people)
         notified = set(event.get("notified_people", []))
         strategy = str(event.get("strategy", ""))
+        remaining_ttl_seconds = ttl_remaining_seconds(
+            event.get("created_at"),
+            event.get("ttl_hours"),
+            now,
+        )
 
         if strategy in ("present", "asap"):
             selected = [person for person in recipients if is_home(hass, person)]
@@ -261,6 +277,7 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
                     tag=str(event.get("tag", "")),
                     actions=list(event.get("mobile_actions", [])),
                     strategy=strategy,
+                    timeout_seconds=remaining_ttl_seconds,
                 )
             except HomeAssistantError:
                 _LOGGER.exception(
