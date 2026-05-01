@@ -44,7 +44,6 @@
 - `notification_engine.list_events`
 - `notification_engine.send_info`
 - `notification_engine.process_events`
-- `notification_engine.notify_person`
 - `notification_engine.delete_event`
 - `notification_engine.purge_events`
 

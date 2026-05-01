@@ -1,7 +1,7 @@
 {
   "domain": "notification_engine",
   "name": "Notification Engine",
-  "codeowners": [],
+  "codeowners": ["@ygiraud"],
   "config_flow": true,
   "dependencies": ["lovelace"],
   "documentation": "https://github.com/ygiraud/ha-notification-engine",

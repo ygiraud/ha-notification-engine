@@ -7,7 +7,6 @@ SERVICE_CREATE_EVENT = "create_event"
 SERVICE_LIST_EVENTS = "list_events"
 SERVICE_PROCESS_EVENTS = "process_events"
 SERVICE_SEND_INFO = "send_info"
-SERVICE_NOTIFY_PERSON = "notify_person"
 SERVICE_DELETE_EVENT = "delete_event"
 SERVICE_PURGE_EVENTS = "purge_events"
 

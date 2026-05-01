@@ -29,7 +29,6 @@ from .const import (
     SERVICE_CREATE_EVENT,
     SERVICE_DELETE_EVENT,
     SERVICE_LIST_EVENTS,
-    SERVICE_NOTIFY_PERSON,
     SERVICE_PROCESS_EVENTS,
     SERVICE_PURGE_EVENTS,
 )
@@ -312,21 +311,20 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         await coordinator.async_request_refresh()
         return result
 
-    async def _notify_person(call: ServiceCall) -> ServiceResponse:
-        event_id = str(call.data.get("id", ""))
-        person = str(call.data.get("person", ""))
-        event = await hass.async_add_executor_job(engine.notify_person, event_id, person)
-        if event is None:
-            return {"ok": False, "error": "event_not_found", "id": event_id}
-        await coordinator.async_request_refresh()
-        return {"ok": True, "event": event}
-
     async def _delete_event(call: ServiceCall) -> ServiceResponse:
-        event_id = str(call.data.get("id", ""))
-        deleted = await hass.async_add_executor_job(engine.delete_event, event_id)
+        key = str(call.data.get("key", "")).strip()
+        event_id = str(call.data.get("id", "")).strip()
+        if key:
+            deleted = await hass.async_add_executor_job(engine.delete_event_by_key, key)
+            lookup = key
+        elif event_id:
+            deleted = await hass.async_add_executor_job(engine.delete_event, event_id)
+            lookup = event_id
+        else:
+            return {"ok": False, "error": "missing_key_or_id"}
         if deleted is None:
-            return {"ok": False, "error": "event_not_found", "id": event_id}
-        await clear_tag_for_all(hass, people_config(domain_data), str(deleted.get("tag", f"notif_{event_id}")))
+            return {"ok": False, "error": "event_not_found", "lookup": lookup}
+        await clear_tag_for_all(hass, people_config(domain_data), str(deleted.get("tag", f"notif_{deleted.get('id', '')}")))
         await coordinator.async_request_refresh()
         return {"ok": True, "deleted": True, "event": deleted}
 
@@ -405,7 +403,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.services.async_register(DOMAIN, SERVICE_LIST_EVENTS, _list_events, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_SEND_INFO, _send_info, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_PROCESS_EVENTS, _process_events, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(DOMAIN, SERVICE_NOTIFY_PERSON, _notify_person, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_DELETE_EVENT, _delete_event, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_PURGE_EVENTS, _purge_events, supports_response=SupportsResponse.OPTIONAL)
 

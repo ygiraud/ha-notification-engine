@@ -106,9 +106,8 @@
 | `notification_engine.list_events` | List all pending events |
 | `notification_engine.send_info` | Send a transient info notification |
 | `notification_engine.process_events` | Trigger event processing manually |
-| `notification_engine.notify_person` | Send a notification directly to a person |
-| `notification_engine.delete_event` | Delete an event by key |
-| `notification_engine.purge_events` | Delete all events matching optional filters |
+| `notification_engine.delete_event` | Delete an event by key or internal id |
+| `notification_engine.purge_events` | Delete all events |
 
 **Response contract:**
 
@@ -257,15 +256,13 @@ automation:
 ### Delete or purge events
 
 ```yaml
-# Delete a specific event
+# Delete a specific event by key
 - service: notification_engine.delete_event
   data:
     key: washing_machine_done
 
-# Purge all delivered events
+# Purge all events
 - service: notification_engine.purge_events
-  data:
-    status: delivered
 ```
 
 ---

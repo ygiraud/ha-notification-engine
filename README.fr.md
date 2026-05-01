@@ -106,9 +106,8 @@
 | `notification_engine.list_events` | Lister tous les événements en attente |
 | `notification_engine.send_info` | Envoyer une notification info éphémère |
 | `notification_engine.process_events` | Déclencher manuellement le traitement des événements |
-| `notification_engine.notify_person` | Envoyer une notification directement à une personne |
-| `notification_engine.delete_event` | Supprimer un événement par clé |
-| `notification_engine.purge_events` | Supprimer tous les événements correspondant à des filtres optionnels |
+| `notification_engine.delete_event` | Supprimer un événement par clé logique ou id interne |
+| `notification_engine.purge_events` | Supprimer tous les événements |
 
 **Contrat de réponse :**
 
@@ -257,15 +256,13 @@ automation:
 ### Supprimer ou purger des événements
 
 ```yaml
-# Supprimer un événement spécifique
+# Supprimer un événement spécifique par clé
 - service: notification_engine.delete_event
   data:
     key: lave_linge_termine
 
-# Purger tous les événements livrés
+# Purger tous les événements
 - service: notification_engine.purge_events
-  data:
-    status: delivered
 ```
 
 ---

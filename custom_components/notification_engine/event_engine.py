@@ -258,12 +258,27 @@ class NotificationEventEngine:
         return {"removed": removed, "remaining": len(kept)}
 
     def delete_event(self, event_id: str) -> dict[str, Any] | None:
-        """Delete one event by id."""
+        """Delete one event by internal id."""
         events = self.load_events()
         kept: list[dict[str, Any]] = []
         deleted_event: dict[str, Any] | None = None
         for event in events:
             if event.get("id") == event_id:
+                deleted_event = event
+            else:
+                kept.append(event)
+        if deleted_event is None:
+            return None
+        self.save_events(kept)
+        return deleted_event
+
+    def delete_event_by_key(self, key: str) -> dict[str, Any] | None:
+        """Delete the first pending event matching a logical key."""
+        events = self.load_events()
+        kept: list[dict[str, Any]] = []
+        deleted_event: dict[str, Any] | None = None
+        for event in events:
+            if deleted_event is None and event.get("key") == key and event.get("status") == "pending":
                 deleted_event = event
             else:
                 kept.append(event)

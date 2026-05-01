@@ -2,9 +2,9 @@
 
 ## Last Agent
 
-- Name: Codex
-- Date: 2026-04-29 Europe/Paris (UTC+2)
-- Context: Durcissement multiplateforme de la strategie `alert` avec notification critique iPhone et canal `alarm_stream` sur Android, tests unitaires, bump de version et note explicite dans la documentation.
+- Name: Claude
+- Date: 2026-05-01 Europe/Paris (UTC+2)
+- Context: Corrections pre-v1.0.0 : suppression du service `notify_person`, correction du bug `delete_event` (key/id), correction de la doc `purge_events`, ajout `codeowners`. Version reste en 0.2.3.
 
 ---
 

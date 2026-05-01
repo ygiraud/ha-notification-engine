@@ -83,28 +83,21 @@ process_events:
   name: Process events
   description: Process pending events and send notifications according to strategy.
 
-notify_person:
-  name: Mark person notified
-  description: Mark one person as notified for an event.
-  fields:
-    id:
-      name: Event id
-      required: true
-      selector:
-        text:
-    person:
-      name: Person entity
-      required: true
-      selector:
-        text:
-
 delete_event:
   name: Delete event
-  description: Delete one event by id.
+  description: Delete one event by logical key (recommended) or internal id.
   fields:
+    key:
+      name: Event key
+      description: Logical key used when the event was created. Takes priority over id.
+      required: false
+      example: "washing_machine_done"
+      selector:
+        text:
     id:
       name: Event id
-      required: true
+      description: Internal event id (evt_xxx). Use key instead when possible.
+      required: false
       selector:
         text:
 
