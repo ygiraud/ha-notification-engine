@@ -101,6 +101,23 @@ def normalize_notified_at(value: Any) -> dict[str, str]:
         normalized[person_key] = parsed_notified_at.isoformat()
     return normalized
 
+
+def normalize_snoozed_until(value: Any) -> dict[str, str]:
+    """Normalize per-person snooze deadlines."""
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, str] = {}
+    for person, snoozed_until in value.items():
+        person_key = str(person).strip()
+        if not person_key:
+            continue
+        parsed_snoozed_until = parse_created_at(snoozed_until)
+        if parsed_snoozed_until is None:
+            continue
+        normalized[person_key] = parsed_snoozed_until.isoformat()
+    return normalized
+
+
 def parse_actions(value: Any) -> list[dict[str, str]]:
     """Parse actions from list/dict-like inputs, JSON or Python literal strings."""
 
@@ -182,6 +199,7 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     normalized["ttl_hours"] = normalize_ttl_hours(normalized.get("ttl_hours"))
     normalized["renotify_minutes"] = normalize_renotify_minutes(normalized.get("renotify_minutes"))
     normalized["notified_at"] = normalize_notified_at(normalized.get("notified_at"))
+    normalized["snoozed_until"] = normalize_snoozed_until(normalized.get("snoozed_until"))
     return normalized
 
 
@@ -221,6 +239,7 @@ def make_event(
             "renotify_minutes": renotify_minutes,
             "notified_people": [],
             "notified_at": {},
+            "snoozed_until": {},
             "history": [{"at": now, "action": "created"}],
         }
     )
@@ -382,8 +401,49 @@ class NotificationEventEngine:
             notified_at = normalize_notified_at(event.get("notified_at"))
             notified_at[person] = now
             event["notified_at"] = notified_at
+            snoozed_until = normalize_snoozed_until(event.get("snoozed_until"))
+            snoozed_until.pop(person, None)
+            event["snoozed_until"] = snoozed_until
             event["updated_at"] = now
             event.setdefault("history", []).append({"at": now, "action": "notified", "person": person})
+            self.save_events(events)
+            return event
+        return None
+
+    def snooze_event(
+        self,
+        tag: str,
+        person: str,
+        minutes: int,
+        now: datetime | None = None,
+    ) -> dict[str, Any] | None:
+        """Defer one pending event for one person until now + minutes."""
+        if minutes <= 0:
+            raise ValueError("minutes must be a positive integer")
+
+        current_time = now or datetime.now(timezone.utc)
+        snoozed_until_at = datetime.fromtimestamp(
+            current_time.timestamp() + (minutes * 60),
+            tz=timezone.utc,
+        ).isoformat()
+
+        events = self.load_events()
+        for event in events:
+            if event.get("tag") != tag or event.get("status") != "pending":
+                continue
+            event_snoozed_until = normalize_snoozed_until(event.get("snoozed_until"))
+            event_snoozed_until[person] = snoozed_until_at
+            event["snoozed_until"] = event_snoozed_until
+            updated_at = current_time.isoformat()
+            event["updated_at"] = updated_at
+            event.setdefault("history", []).append(
+                {
+                    "at": updated_at,
+                    "action": "snoozed",
+                    "person": person,
+                    "minutes": minutes,
+                }
+            )
             self.save_events(events)
             return event
         return None

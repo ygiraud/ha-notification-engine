@@ -113,6 +113,8 @@ normalize_older_than_hours = EVENT_ENGINE_MODULE.normalize_older_than_hours
 normalize_renotify_minutes = EVENT_ENGINE_MODULE.normalize_renotify_minutes
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
 process_events_core = DELIVERY_MODULE.process_events_core
+is_snooze_due_for_person = DELIVERY_MODULE.is_snooze_due_for_person
+is_snoozed_for_person = DELIVERY_MODULE.is_snoozed_for_person
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
 send_to_notify = DELIVERY_MODULE.send_to_notify
 should_renotify_person = DELIVERY_MODULE.should_renotify_person
@@ -803,6 +805,39 @@ def test_should_renotify_person_only_when_delay_elapsed() -> None:
     ) is False
 
 
+def test_snooze_helpers_distinguish_active_and_due_snooze() -> None:
+    now = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+    active_event = {
+        "snoozed_until": {"person.alice": "2026-05-02T07:15:00+00:00"},
+    }
+    due_event = {
+        "snoozed_until": {"person.alice": "2026-05-02T06:45:00+00:00"},
+    }
+
+    assert is_snoozed_for_person(active_event, "person.alice", now) is True
+    assert is_snooze_due_for_person(active_event, "person.alice", now) is False
+    assert is_snoozed_for_person(due_event, "person.alice", now) is False
+    assert is_snooze_due_for_person(due_event, "person.alice", now) is True
+
+
+def test_snooze_event_sets_deadline_and_notify_person_clears_it(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(key="door", title="Door", message="Open")["event"]
+    now = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+
+    snoozed = engine.snooze_event(created["tag"], "person.alice", 30, now=now)
+
+    assert snoozed is not None
+    stored = engine.load_events()[0]
+    assert stored["snoozed_until"]["person.alice"] == "2026-05-02T07:30:00+00:00"
+    assert any(item.get("action") == "snoozed" for item in stored["history"])
+
+    engine.notify_person(created["id"], "person.alice")
+
+    after_notify = engine.load_events()[0]
+    assert "person.alice" not in after_notify["snoozed_until"]
+
+
 def test_process_events_core_renotifies_unacknowledged_asap_after_delay(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
     created = engine.create_event(
@@ -877,6 +912,172 @@ def test_process_events_core_renotifies_unacknowledged_asap_after_delay(tmp_path
     assert len(hass.services.calls) == 2
     assert stored["notified_people"] == ["person.alice"]
     assert len(notified_entries) == 2
+
+
+def test_process_events_core_skips_active_snooze_and_resends_once_due(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="snooze",
+        strategy="alert",
+        title="Reminder",
+        message="Deferred",
+        recipients=["person.alice"],
+    )["event"]
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    now = datetime.now(timezone.utc)
+    events = engine.load_events()
+    for event in events:
+        if event["id"] == created["id"]:
+            event["notified_people"] = ["person.alice"]
+            event["notified_at"] = {
+                "person.alice": (now - timedelta(minutes=5)).isoformat()
+            }
+            event["snoozed_until"] = {
+                "person.alice": (now + timedelta(minutes=10)).isoformat()
+            }
+    engine.save_events(events)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    skipped = asyncio.run(process_events_core(hass, domain_data))
+    assert skipped == {"ok": True, "sent": 0}
+    assert hass.services.calls == []
+
+    events = engine.load_events()
+    for event in events:
+        if event["id"] == created["id"]:
+            event["snoozed_until"] = {
+                "person.alice": (now - timedelta(minutes=1)).isoformat()
+            }
+    engine.save_events(events)
+
+    resent = asyncio.run(process_events_core(hass, domain_data))
+    assert resent == {"ok": True, "sent": 1}
+    assert len(hass.services.calls) == 1
+    payload = hass.services.calls[0][2]
+    assert payload["data"]["person_entity"] == "person.alice"
+    assert payload["data"]["action_data"] == {"person_entity": "person.alice"}
+    stored = engine.load_events()[0]
+    assert "person.alice" not in stored["snoozed_until"]
+
+
+def test_async_on_mobile_action_snoozes_for_acting_person(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="snooze-action",
+        title="Reminder",
+        message="Tap snooze",
+        recipients=["person.alice"],
+        actions=[{"action": "SNOOZE_30", "title": "Later"}],
+    )["event"]
+
+    class _Coordinator:
+        def __init__(self) -> None:
+            self.refresh_calls = 0
+
+        async def async_request_refresh(self) -> None:
+            self.refresh_calls += 1
+
+    class _Bus:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def async_fire(self, event_type: str, event_data: dict[str, object]) -> None:
+            self.calls.append((event_type, event_data))
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.bus = _Bus()
+            self.services = _Services()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    coordinator = _Coordinator()
+    hass = _Hass()
+    handler = NotificationEngineServices(
+        hass,
+        {
+            "people": {
+                "person.alice": {
+                    "notify_service": "notify.mobile_app_alice",
+                    "enabled": True,
+                }
+            }
+        },
+        engine,
+        coordinator,
+    )
+
+    mobile_event = Event()
+    mobile_event.data = {
+        "action": f"NOTIF_CUSTOM_{created['id']}_0",
+        "person_entity": "person.alice",
+    }
+
+    asyncio.run(handler.async_on_mobile_action(mobile_event))
+
+    stored = engine.load_events()[0]
+    assert "person.alice" in stored["snoozed_until"]
+    assert coordinator.refresh_calls == 1
+    assert hass.bus.calls == []
+    assert hass.services.calls == [
+        (
+            "notify",
+            "mobile_app_alice",
+            {"message": "clear_notification", "data": {"tag": created["tag"]}},
+            True,
+        )
+    ]
 
 
 def test_process_events_core_renotifies_alert_after_delay(tmp_path) -> None:
