@@ -8,7 +8,7 @@
 [![HACS Validation](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=HACS+Validation)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![Hassfest](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=Hassfest)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0--rc.1-orange.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 🇫🇷 [Version française](README.fr.md)
@@ -381,9 +381,9 @@ tests/
 
 ## 🗺 Roadmap
 
-### v1.1.0
+### v1.1.0 ✅
 
-- ✅ **Event TTL** — optional `ttl_hours` field on `create_event`; expired events are automatically removed during `process_events`
+- **Event TTL** — optional `ttl_hours` field on `create_event`; expired events are automatically removed during `process_events`
 - **Re-notification** — resend an unacknowledged `asap` event after a configurable delay
 - **`purge_events` filters** — filter by strategy, status, or age (`older_than_hours`)
 - **`get_event` service** — retrieve a single event by `key` or `id`, useful for template conditions in automations

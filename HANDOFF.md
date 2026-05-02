@@ -23,17 +23,19 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - ✅ Roadmap updated: snooze moved from v1.2 -> v1.1
 - ✅ AGENTS.md updated: GitHub issue closing convention + v1.1 feature table
 
-### v1.1 - In progress
+### v1.1 - Complete
 
-5 features tracked for implementation:
+5 features implemented and reviewed:
 
 | # | Feature | GitHub Issue | Status |
 |---|---|---|---|
-| 1 | Event TTL | #1 | completed |
-| 2 | Re-notification | #2 | completed |
-| 3 | `purge_events` filters | #3 | completed |
-| 4 | `get_event` service | #4 | completed |
-| 5 | `snooze` action | #5 | completed |
+| 1 | Event TTL | #1 | ✅ completed |
+| 2 | Re-notification | #2 | ✅ completed |
+| 3 | `purge_events` filters | #3 | ✅ completed |
+| 4 | `get_event` service | #4 | ✅ completed |
+| 5 | `snooze` action | #5 | ✅ completed |
+
+Pre-release tag: `v1.1.0-rc.1` (testing in progress)
 
 ---
 
@@ -182,5 +184,6 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 
 ## Next Steps
 
-1. Codex : continuer avec la feature #5 (`snooze` action)
-1. Codex : v1.1 terminee. Attendre la priorisation de la suite.
+1. Utilisateur : tester la pre-release `v1.1.0-rc.1` sur instance HA
+2. Claude / Codex : traiter les bugs remontés pendant la période de test
+3. Utilisateur : tagger `v1.1.0` et publier la release HACS une fois les tests concluants
