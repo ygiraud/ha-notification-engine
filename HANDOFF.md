@@ -117,15 +117,17 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 
 ### v1.1 - Complete
 
-5 features tracked for implementation:
+5 features implemented and reviewed:
 
 | # | Feature | GitHub Issue | Status |
 |---|---|---|---|
-| 1 | Event TTL | #1 | completed |
-| 2 | Re-notification | #2 | completed |
-| 3 | `purge_events` filters | #3 | completed |
-| 4 | `get_event` service | #4 | completed |
-| 5 | `snooze` action | #5 | completed |
+| 1 | Event TTL | #1 | ✅ completed |
+| 2 | Re-notification | #2 | ✅ completed |
+| 3 | `purge_events` filters | #3 | ✅ completed |
+| 4 | `get_event` service | #4 | ✅ completed |
+| 5 | `snooze` action | #5 | ✅ completed |
+
+Pre-release tag: `v1.1.0-rc.1` (testing in progress)
 
 ---
 
@@ -188,5 +190,6 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 
 ## Next Steps
 
-1. Utilisateur : terminer le rebase et verifier que l'etat Git est propre
-2. Utilisateur / Claude : prioriser la suite apres v1.1
+1. Utilisateur : tester la pre-release `v1.1.0-rc.1` sur instance HA
+2. Claude / Codex : traiter les bugs remontes pendant la periode de test
+3. Utilisateur : tagger `v1.1.0` et publier la release HACS une fois les tests concluants
