@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import ast
 import logging
+import re
 from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .delivery import (
+    clear_tag_for_person,
     clear_tag_for_all,
     event_recipients,
     people_config,
@@ -20,6 +22,7 @@ from .delivery import (
 from .event_engine import NotificationEventEngine, normalize_older_than_hours, parse_actions
 
 _LOGGER = logging.getLogger(__name__)
+_SNOOZE_ACTION_RE = re.compile(r"^SNOOZE_(\d+)$")
 
 
 def _parse_ttl_hours(value: Any) -> float | None:
@@ -104,6 +107,31 @@ def _extract_target_entities(call: ServiceCall) -> list[str]:
     if data.get("entity_id") is not None:
         return _normalize_entities(data.get("entity_id"))
     return _normalize_entities(getattr(call, "target", None))
+
+
+def _mobile_action_person_entity(
+    event_data: dict[str, Any],
+    people: dict[str, dict[str, Any]],
+) -> str | None:
+    """Extract the acting person entity from a mobile action event payload."""
+    direct_person = str(event_data.get("person_entity", "")).strip()
+    if direct_person in people:
+        return direct_person
+
+    action_data = event_data.get("action_data")
+    if isinstance(action_data, dict):
+        nested_person = str(action_data.get("person_entity", "")).strip()
+        if nested_person in people:
+            return nested_person
+
+    source_device_id = str(event_data.get("sourceDeviceID", "")).strip().lower()
+    if source_device_id:
+        for person, person_cfg in people.items():
+            notify_service = str(person_cfg.get("notify_service", "")).strip().lower()
+            if notify_service == f"notify.mobile_app_{source_device_id}":
+                return person
+
+    return None
 
 
 class NotificationEngineServices:
@@ -320,11 +348,37 @@ class NotificationEngineServices:
             if isinstance(actions, list) and len(actions) > action_index
             else {}
         )
+        raw_custom_action = str(custom.get("action", "")).strip()
+        people = people_config(self._domain_data)
+        snooze_match = _SNOOZE_ACTION_RE.match(raw_custom_action)
+        if snooze_match:
+            person_entity = _mobile_action_person_entity(event.data, people)
+            if person_entity is None:
+                _LOGGER.warning(
+                    "Ignoring snooze action for event %s because no acting person could be resolved",
+                    event_id,
+                )
+                return
+            snoozed = await self._hass.async_add_executor_job(
+                self._engine.snooze_event,
+                str(event_obj.get("tag", f"notif_{event_id}")),
+                person_entity,
+                int(snooze_match.group(1)),
+            )
+            if snoozed is not None:
+                await clear_tag_for_person(
+                    self._hass,
+                    people,
+                    person_entity,
+                    str(snoozed.get("tag", f"notif_{event_id}")),
+                )
+                await self._coordinator.async_request_refresh()
+            return
         self._hass.bus.async_fire(
             "notification_engine_custom_action",
             {
                 "id": event_id,
-                "action": str(custom.get("action", "")),
+                "action": raw_custom_action,
                 "title": str(custom.get("title", "")),
                 "source_entity": str(event_obj.get("source_entity", "")),
                 "tag": str(event_obj.get("tag", f"notif_{event_id}")),

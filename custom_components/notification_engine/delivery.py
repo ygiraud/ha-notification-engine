@@ -102,6 +102,28 @@ def should_renotify_person(event: dict[str, Any], person: str, now: datetime) ->
     return due_at <= now.timestamp()
 
 
+def is_snoozed_for_person(event: dict[str, Any], person: str, now: datetime) -> bool:
+    """Return whether one pending event is still snoozed for one person."""
+    snoozed_until = event.get("snoozed_until", {})
+    if not isinstance(snoozed_until, dict):
+        return False
+    deadline = parse_created_at(snoozed_until.get(person))
+    if deadline is None:
+        return False
+    return now.timestamp() < deadline.timestamp()
+
+
+def is_snooze_due_for_person(event: dict[str, Any], person: str, now: datetime) -> bool:
+    """Return whether one snoozed event should be sent again now."""
+    snoozed_until = event.get("snoozed_until", {})
+    if not isinstance(snoozed_until, dict):
+        return False
+    deadline = parse_created_at(snoozed_until.get(person))
+    if deadline is None:
+        return False
+    return now.timestamp() >= deadline.timestamp()
+
+
 def select_nearest_recipients(
     hass: Any,
     people: dict[str, dict[str, Any]],
@@ -158,6 +180,7 @@ async def send_to_notify(
     message: str,
     tag: str,
     actions: list[dict[str, Any]],
+    person_entity: str | None = None,
     strategy: str = "",
     timeout_seconds: int | None = None,
 ) -> None:
@@ -179,6 +202,9 @@ async def send_to_notify(
         "message": message,
         "data": {"tag": tag, "group": tag},
     }
+    if person_entity:
+        payload["data"]["person_entity"] = person_entity
+        payload["data"]["action_data"] = {"person_entity": person_entity}
     if timeout_seconds is not None and timeout_seconds > 0:
         payload["data"]["timeout"] = timeout_seconds
     if strategy == "info":
@@ -217,6 +243,29 @@ async def clear_tag_for_all(hass: Any, people: dict[str, dict[str, Any]], tag: s
             {"message": "clear_notification", "data": {"tag": tag}},
             blocking=True,
         )
+
+
+async def clear_tag_for_person(
+    hass: Any,
+    people: dict[str, dict[str, Any]],
+    person: str,
+    tag: str,
+) -> None:
+    """Clear one notification tag on a single enabled mobile target."""
+    person_config = people.get(person, {})
+    if not person_enabled(person_config):
+        return
+    notify_service = str(person_config.get("notify_service", ""))
+    parts = _service_parts(notify_service)
+    if parts is None:
+        return
+    domain, service = parts
+    await hass.services.async_call(
+        domain,
+        service,
+        {"message": "clear_notification", "data": {"tag": tag}},
+        blocking=True,
+    )
 
 
 async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[str, Any]:
@@ -280,8 +329,14 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
             selected = []
 
         for person in selected:
+            if is_snoozed_for_person(event, person, now):
+                continue
             if person in notified and not (
-                strategy != "info" and should_renotify_person(event, person, now)
+                strategy != "info"
+                and (
+                    should_renotify_person(event, person, now)
+                    or is_snooze_due_for_person(event, person, now)
+                )
             ):
                 continue
             person_cfg = people.get(person, {})
@@ -298,6 +353,7 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
                     message=str(event.get("message", "")),
                     tag=str(event.get("tag", "")),
                     actions=list(event.get("mobile_actions", [])),
+                    person_entity=person,
                     strategy=strategy,
                     timeout_seconds=remaining_ttl_seconds,
                 )

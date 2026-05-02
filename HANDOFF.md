@@ -4,7 +4,7 @@
 
 - Name: Codex
 - Date: 2026-05-02 Europe/Paris (UTC+2)
-- Context: Feature v1.1 #4 implemented: nouveau service read-only `get_event` par `key` ou `id`.
+- Context: Feature v1.1 #5 implemented: snooze par personne via actions mobiles `SNOOZE_<N>`.
 
 ---
 
@@ -33,7 +33,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 | 2 | Re-notification | #2 | completed |
 | 3 | `purge_events` filters | #3 | completed |
 | 4 | `get_event` service | #4 | completed |
-| 5 | `snooze` action | #5 | pending |
+| 5 | `snooze` action | #5 | completed |
 
 ---
 
@@ -56,7 +56,10 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - `older_than_hours` est optionnel et doit etre strictement positif. Valeur invalide -> erreur de service `invalid_older_than_hours`.
 - Avec un filtre `older_than_hours`, un evenement sans `created_at` exploitable n'est pas purge.
 - `get_event` est un service read-only. Par `id`, il retourne l'evenement exact. Par `key`, il retourne le premier evenement `pending` correspondant, pour rester coherent avec `delete_event`.
-- `snooze` : architecture arbitree. Voir section "Architecture snooze (#5)" ci-dessous.
+- `snooze` est gere par actions mobiles `SNOOZE_<N>` sans nouveau champ sur `create_event`.
+- Le snooze est par personne, stocke dans `snoozed_until`, et bloque l'envoi tant que l'echeance n'est pas atteinte.
+- Quand le snooze expire, une unique notification repart pour cette personne, puis l'entree `snoozed_until` est nettoyee lors du nouvel envoi.
+- L'identite de la personne est transmise dans le payload mobile via `person_entity` / `action_data.person_entity` pour permettre au listener de resoudre l'acteur de facon deterministe.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
 
@@ -118,6 +121,13 @@ tests/
 - Documentation du service `get_event` ajoutee dans `services.yaml`.
 - Tests unitaires ajoutes pour la recherche par `key`, par `id` et les erreurs du service.
 - Tests executes avec succes: `pytest tests/test_event_engine.py` -> `30 passed`.
+- Ajout du champ persistant `snoozed_until` par personne dans `event_engine.py`.
+- Ajout de `snooze_event(tag, person, minutes)` dans le moteur, avec historique `snoozed` et nettoyage automatique du snooze lors du prochain `notify_person`.
+- `process_events_core` ignore les personnes encore snoozees et re-notifie une fois le snooze expire, meme si la personne a deja ete notifiee auparavant.
+- Le payload mobile embarque maintenant `person_entity` et `action_data.person_entity` pour que l'action retournee identifie la bonne personne.
+- Le listener `mobile_app_notification_action` intercepte `SNOOZE_<N>`, applique le snooze a la bonne personne et efface la notification uniquement sur son device.
+- Tests unitaires ajoutes pour la persistance du snooze, la logique active/due, le reenvoi apres expiration et le listener mobile.
+- Tests executes avec succes: `pytest tests/test_event_engine.py` -> `34 passed`.
 
 ---
 
@@ -173,3 +183,4 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 ## Next Steps
 
 1. Codex : continuer avec la feature #5 (`snooze` action)
+1. Codex : v1.1 terminee. Attendre la priorisation de la suite.
