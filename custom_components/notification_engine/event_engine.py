@@ -73,6 +73,19 @@ def ttl_remaining_seconds(
     return max(0, int(expires_at - current_time.timestamp()))
 
 
+def normalize_older_than_hours(value: Any) -> float | None:
+    """Normalize older_than_hours to a positive float or None."""
+    if value in (None, ""):
+        return None
+    try:
+        older_than_hours = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("older_than_hours must be a positive number") from None
+    if older_than_hours <= 0:
+        raise ValueError("older_than_hours must be a positive number")
+    return older_than_hours
+
+
 def normalize_notified_at(value: Any) -> dict[str, str]:
     """Normalize per-person notification timestamps."""
     if not isinstance(value, dict):
@@ -418,7 +431,51 @@ class NotificationEventEngine:
         self.save_events(kept)
         return deleted_event
 
-    def purge_events(self) -> dict[str, Any]:
-        """Delete all events."""
-        self.save_events([])
-        return {"purged": True, "remaining": 0}
+    def purge_events(
+        self,
+        strategy: str | None = None,
+        status: str | None = None,
+        older_than_hours: float | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Delete events matching the optional filters."""
+        normalized_strategy = str(strategy or "").strip()
+        normalized_status = str(status or "").strip()
+        normalized_older_than_hours = normalize_older_than_hours(older_than_hours)
+        current_time = now or datetime.now(timezone.utc)
+
+        events = self.load_events()
+        kept: list[dict[str, Any]] = []
+        removed: list[dict[str, Any]] = []
+
+        for event in events:
+            matches = True
+
+            if normalized_strategy and str(event.get("strategy", "")) != normalized_strategy:
+                matches = False
+
+            if normalized_status and str(event.get("status", "")) != normalized_status:
+                matches = False
+
+            if normalized_older_than_hours is not None:
+                created_at = parse_created_at(event.get("created_at"))
+                if created_at is None:
+                    matches = False
+                else:
+                    age_seconds = current_time.timestamp() - created_at.timestamp()
+                    if age_seconds < normalized_older_than_hours * 3600:
+                        matches = False
+
+            if matches:
+                removed.append(event)
+            else:
+                kept.append(event)
+
+        if removed:
+            self.save_events(kept)
+
+        return {
+            "purged": True,
+            "removed": removed,
+            "remaining": len(kept),
+        }

@@ -17,7 +17,7 @@ from .delivery import (
     process_events_core,
     send_to_notify,
 )
-from .event_engine import NotificationEventEngine, parse_actions
+from .event_engine import NotificationEventEngine, normalize_older_than_hours, parse_actions
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +46,14 @@ def _parse_renotify_minutes(value: Any) -> float | None:
     if renotify_minutes <= 0:
         return None
     return renotify_minutes
+
+
+def _parse_older_than_hours(value: Any) -> float | None:
+    """Validate optional older_than_hours from service payload."""
+    try:
+        return normalize_older_than_hours(value)
+    except ValueError:
+        return None
 
 
 def _normalize_entities(value: Any) -> list[str]:
@@ -219,12 +227,24 @@ class NotificationEngineServices:
         return {"ok": True, "deleted": True, "event": deleted}
 
     async def async_purge_events(self, call: ServiceCall) -> ServiceResponse:
-        """Delete all stored events and clear their tags on every device."""
-        events_before = await self._hass.async_add_executor_job(self._engine.load_events)
-        result = await self._hass.async_add_executor_job(self._engine.purge_events)
+        """Delete stored events matching optional filters and clear their tags."""
+        strategy = str(call.data.get("strategy", "")).strip()
+        status = str(call.data.get("status", "")).strip()
+        older_than_hours = _parse_older_than_hours(call.data.get("older_than_hours"))
+        if call.data.get("older_than_hours") not in (None, "") and older_than_hours is None:
+            return {"ok": False, "error": "invalid_older_than_hours"}
+        result = await self._hass.async_add_executor_job(
+            self._engine.purge_events,
+            strategy or None,
+            status or None,
+            older_than_hours,
+        )
+        removed_events = result.get("removed", [])
+        if not isinstance(removed_events, list):
+            removed_events = []
         tags_to_clear = {
             str(event.get("tag", ""))
-            for event in events_before
+            for event in removed_events
             if isinstance(event, dict) and str(event.get("tag", ""))
         }
         for tag in tags_to_clear:

@@ -125,4 +125,34 @@ delete_event:
 
 purge_events:
   name: Purge events
-  description: Delete all events.
+  description: Delete stored events, optionally filtered by strategy, status, and minimum age.
+  fields:
+    strategy:
+      name: Strategy
+      description: Delete only events using this exact delivery strategy.
+      required: false
+      selector:
+        select:
+          options:
+            - alert
+            - present
+            - asap
+            - away_reminder
+            - info
+    status:
+      name: Status
+      description: Delete only events with this exact status.
+      required: false
+      selector:
+        select:
+          options:
+            - pending
+            - done
+    older_than_hours:
+      name: Older than hours
+      description: Delete only events created at least this many hours ago. Must be strictly positive.
+      required: false
+      selector:
+        number:
+          min: 0.1
+          mode: box

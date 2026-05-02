@@ -108,12 +108,14 @@ SERVICES_MODULE = _load_module(
 
 NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
+normalize_older_than_hours = EVENT_ENGINE_MODULE.normalize_older_than_hours
 normalize_renotify_minutes = EVENT_ENGINE_MODULE.normalize_renotify_minutes
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
 process_events_core = DELIVERY_MODULE.process_events_core
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
 send_to_notify = DELIVERY_MODULE.send_to_notify
 should_renotify_person = DELIVERY_MODULE.should_renotify_person
+parse_older_than_hours = SERVICES_MODULE._parse_older_than_hours
 extract_target_entities = SERVICES_MODULE._extract_target_entities
 ttl_remaining_seconds = EVENT_ENGINE_MODULE.ttl_remaining_seconds
 
@@ -178,6 +180,15 @@ def test_ttl_remaining_seconds_returns_zero_once_expired() -> None:
         1,
         now,
     ) == 0
+
+
+def test_normalize_and_parse_older_than_hours_reject_invalid_values() -> None:
+    assert normalize_older_than_hours(None) is None
+    assert normalize_older_than_hours("2.5") == 2.5
+    assert parse_older_than_hours("1") == 1.0
+    assert parse_older_than_hours("") is None
+    assert parse_older_than_hours(0) is None
+    assert parse_older_than_hours("bad") is None
 
 
 def test_normalize_renotify_minutes_requires_positive_number() -> None:
@@ -476,8 +487,87 @@ def test_purge_events_clears_all_events(tmp_path) -> None:
 
     result = engine.purge_events()
 
-    assert result == {"purged": True, "remaining": 0}
+    assert result["purged"] is True
+    assert len(result["removed"]) == 2
+    assert result["remaining"] == 0
     assert engine.load_events() == []
+
+
+def test_purge_events_filters_with_and_semantics(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    old_pending_alert = engine.create_event(
+        key="old-pending-alert",
+        title="One",
+        message="First",
+        strategy="alert",
+    )["event"]
+    old_done_alert = engine.create_event(
+        key="old-done-alert",
+        title="Two",
+        message="Second",
+        strategy="alert",
+    )["event"]
+    fresh_pending_alert = engine.create_event(
+        key="fresh-pending-alert",
+        title="Three",
+        message="Third",
+        strategy="alert",
+    )["event"]
+    old_pending_info = engine.create_event(
+        key="old-pending-info",
+        title="Four",
+        message="Fourth",
+        strategy="info",
+    )["event"]
+
+    engine.ack_event(old_done_alert["id"], "done")
+
+    now = datetime(2026, 5, 2, 12, 0, 0, tzinfo=timezone.utc)
+    events = engine.load_events()
+    for event in events:
+        if event["id"] in {
+            old_pending_alert["id"],
+            old_done_alert["id"],
+            old_pending_info["id"],
+        }:
+            event["created_at"] = (now - timedelta(hours=3)).isoformat()
+        elif event["id"] == fresh_pending_alert["id"]:
+            event["created_at"] = (now - timedelta(minutes=30)).isoformat()
+    engine.save_events(events)
+
+    result = engine.purge_events(
+        strategy="alert",
+        status="pending",
+        older_than_hours=2,
+        now=now,
+    )
+
+    assert [event["id"] for event in result["removed"]] == [old_pending_alert["id"]]
+    assert [event["id"] for event in engine.load_events()] == [
+        old_done_alert["id"],
+        fresh_pending_alert["id"],
+        old_pending_info["id"],
+    ]
+
+
+def test_purge_events_with_age_filter_keeps_events_without_created_at(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    removable = engine.create_event(key="old", title="Old", message="Old")["event"]
+    missing_created_at = engine.create_event(key="unknown", title="Unknown", message="Unknown")["event"]
+
+    now = datetime(2026, 5, 2, 12, 0, 0, tzinfo=timezone.utc)
+    events = engine.load_events()
+    for event in events:
+        if event["id"] == removable["id"]:
+            event["created_at"] = (now - timedelta(hours=4)).isoformat()
+        elif event["id"] == missing_created_at["id"]:
+            event["created_at"] = ""
+    engine.save_events(events)
+
+    result = engine.purge_events(older_than_hours=2, now=now)
+
+    assert [event["id"] for event in result["removed"]] == [removable["id"]]
+    assert [event["id"] for event in engine.load_events()] == [missing_created_at["id"]]
 
 
 def test_purge_expired_events_removes_only_elapsed_pending_events(tmp_path) -> None:

@@ -4,7 +4,7 @@
 
 - Name: Codex
 - Date: 2026-05-02 Europe/Paris (UTC+2)
-- Context: Feature v1.1 #2 implemented and tested on HA: optional re-notification via `renotify_minutes`, plus architecture concern identified around time-based scheduling.
+- Context: Feature v1.1 #3 implemented: `purge_events` accepte des filtres optionnels `strategy`, `status`, `older_than_hours`.
 
 ---
 
@@ -31,7 +31,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 |---|---|---|---|
 | 1 | Event TTL | #1 | completed |
 | 2 | Re-notification | #2 | completed |
-| 3 | `purge_events` filters | #3 | pending |
+| 3 | `purge_events` filters | #3 | completed |
 | 4 | `get_event` service | #4 | pending |
 | 5 | `snooze` action | #5 | pending |
 
@@ -52,6 +52,9 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - La re-notification est calculee par personne, a partir du dernier envoi enregistre, et cesse des que l'evenement n'est plus `pending`.
 - `renotify_minutes` definit un delai minimal avant re-emission. L'envoi effectif depend encore du prochain passage de `process_events`.
 - `DEFAULT_PROCESS_EVENTS_INTERVAL` passe de 5 minutes a 1 minute (`const.py`) pour donner une precision adequate a TTL, re-notification et futur snooze. Architecture polling conservee (pas de `async_track_point_in_time`) : simple, resiliente aux redemarrages HA, overhead negligeable.
+- `purge_events` conserve son comportement historique sans filtre (purge totale), mais accepte maintenant des filtres optionnels combines en mode `AND` sur `strategy`, `status` et `older_than_hours`.
+- `older_than_hours` est optionnel et doit etre strictement positif. Valeur invalide -> erreur de service `invalid_older_than_hours`.
+- Avec un filtre `older_than_hours`, un evenement sans `created_at` exploitable n'est pas purge.
 - `snooze` : architecture arbitree. Voir section "Architecture snooze (#5)" ci-dessous.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
@@ -101,6 +104,13 @@ tests/
 - Tests unitaires ajoutes pour stockage TTL, validation, purge selective, timeout mobile, re-notification et integration dans `process_events`.
 - Ajout d'un test unitaire couvrant explicitement qu'un evenement `info` ne declenche jamais de re-notification, meme si `renotify_minutes` est configure.
 - Validation manuelle reussie sur instance HA : creation avec `ttl_hours`, expiration, suppression de l'evenement et disparition de la notification mobile.
+- Ajout des filtres optionnels `strategy`, `status` et `older_than_hours` au service `purge_events`.
+- Purge selective dans `event_engine.py` avec semantique `AND` entre les filtres et retour detaille des evenements supprimes.
+- Nettoyage des tags mobiles limite aux evenements effectivement purges.
+- Documentation du service `purge_events` mise a jour dans `services.yaml`.
+- Tests unitaires ajoutes pour la validation de `older_than_hours`, la purge selective et le cas d'un `created_at` invalide.
+- Verification syntaxique OK via `python3 -m py_compile`.
+- `pytest` indisponible dans l'environnement courant (`pytest` absent du PATH et du Python systeme), donc tests unitaires non executes ici.
 
 ---
 
@@ -155,4 +165,4 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 
 ## Next Steps
 
-1. Codex : continuer avec la feature #3 (`purge_events` filters)
+1. Codex : continuer avec la feature #4 (`get_event` service)
