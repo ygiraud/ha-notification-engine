@@ -35,6 +35,19 @@ def _parse_ttl_hours(value: Any) -> float | None:
     return ttl_hours
 
 
+def _parse_renotify_minutes(value: Any) -> float | None:
+    """Validate optional renotify_minutes from service payload."""
+    if value in (None, ""):
+        return None
+    try:
+        renotify_minutes = float(value)
+    except (TypeError, ValueError):
+        return None
+    if renotify_minutes <= 0:
+        return None
+    return renotify_minutes
+
+
 def _normalize_entities(value: Any) -> list[str]:
     """Normalize entity inputs from service data or stored events.
 
@@ -116,6 +129,9 @@ class NotificationEngineServices:
         ttl_hours = _parse_ttl_hours(call.data.get("ttl_hours"))
         if call.data.get("ttl_hours") not in (None, "") and ttl_hours is None:
             return {"ok": False, "error": "invalid_ttl_hours"}
+        renotify_minutes = _parse_renotify_minutes(call.data.get("renotify_minutes"))
+        if call.data.get("renotify_minutes") not in (None, "") and renotify_minutes is None:
+            return {"ok": False, "error": "invalid_renotify_minutes"}
         explicit_recipients = _extract_target_entities(call)
         resolved_recipients = event_recipients(
             {"recipients": explicit_recipients}, people_config(self._domain_data)
@@ -132,6 +148,7 @@ class NotificationEngineServices:
             str(call.data.get("message", "")),
             parse_actions(call.data.get("actions", [])),
             ttl_hours,
+            renotify_minutes,
         )
         await process_events_core(self._hass, self._domain_data)
         await self._coordinator.async_request_refresh()

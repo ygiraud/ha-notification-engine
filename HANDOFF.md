@@ -4,7 +4,7 @@
 
 - Name: Codex
 - Date: 2026-05-02 Europe/Paris (UTC+2)
-- Context: Feature v1.1 #1 validated on HA instance after follow-up fixes: periodic processing added and mobile notification timeout aligned with event TTL.
+- Context: Feature v1.1 #2 implemented and tested on HA: optional re-notification via `renotify_minutes`, plus architecture concern identified around time-based scheduling.
 
 ---
 
@@ -30,7 +30,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 | # | Feature | GitHub Issue | Status |
 |---|---|---|---|
 | 1 | Event TTL | #1 | completed |
-| 2 | Re-notification | #2 | pending |
+| 2 | Re-notification | #2 | completed |
 | 3 | `purge_events` filters | #3 | pending |
 | 4 | `get_event` service | #4 | pending |
 | 5 | `snooze` action | #5 | pending |
@@ -48,6 +48,9 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - Les evenements expires suppriment aussi leur `tag` de notification sur les devices configures.
 - `process_events` est maintenant aussi declenche periodiquement toutes les 5 minutes pour rendre le TTL utile sans action manuelle.
 - Les notifications envoyees pour un evenement avec TTL embarquent aussi un `timeout` mobile calcule sur le TTL restant.
+- `renotify_minutes` est optionnel, strictement positif, et est pris en compte pour toutes les strategies sauf `info`.
+- La re-notification est calculee par personne, a partir du dernier envoi enregistre, et cesse des que l'evenement n'est plus `pending`.
+- `renotify_minutes` definit un delai minimal avant re-emission. L'envoi effectif depend encore du prochain passage de `process_events`.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
 
@@ -58,6 +61,8 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - 🟡 `_attr_has_entity_name = True` sur `sensor.py` : non verifie sur instance HA reelle.
 - 🟡 `alert` payload critique : verifie par test unitaire uniquement, pas sur device iOS/Android reel.
 - ✅ Purge TTL et cleanup mobile verifies sur instance HA apres ajout du `timeout` et du traitement periodique.
+- 🟡 Sujet d'architecture ouvert: TTL, re-notification et futur snooze dependent tous d'echeances temporelles, mais le moteur reste base sur `process_events` + polling periodique. Precision et predictibilite a re-evaluer.
+- 🟡 Test HA concluant pour la re-notification, mais la precision du delai reste bornee par la cadence de `process_events` (actuellement 5 minutes si aucun autre declencheur n'arrive).
 - 🟡 `snooze` : necessite un mobile action handler dedie. Architecture a confirmer avant implementation (cf. AGENTS.md Per-Feature Checklist).
 
 ---
@@ -91,8 +96,13 @@ tests/
 - Nettoyage des tags de notification pour les evenements expires.
 - Ajout d'un declenchement periodique de `process_events` toutes les 5 minutes.
 - Ajout d'un `timeout` mobile calcule a partir du TTL restant pour auto-effacer les notifications cote telephone.
+- Ajout du champ optionnel `renotify_minutes` sur `create_event`.
+- Persistance de `renotify_minutes` et des timestamps de notification par personne dans `event_engine.py`.
+- Re-notification des evenements non acquittes apres le delai configure pour toutes les strategies sauf `info`.
+- Tests HA concluants sur la logique de re-notification, avec reserve sur la granularite du scheduling.
 - Documentation service mise a jour dans `services.yaml`.
-- Tests unitaires ajoutes pour stockage TTL, validation, purge selective, timeout mobile et integration dans `process_events`.
+- Tests unitaires ajoutes pour stockage TTL, validation, purge selective, timeout mobile, re-notification et integration dans `process_events`.
+- Ajout d'un test unitaire couvrant explicitement qu'un evenement `info` ne declenche jamais de re-notification, meme si `renotify_minutes` est configure.
 - Validation manuelle reussie sur instance HA : creation avec `ttl_hours`, expiration, suppression de l'evenement et disparition de la notification mobile.
 
 ---
@@ -112,6 +122,6 @@ tests/
 
 ## Next Steps
 
-1. Utilisateur : valider le commit final de la feature #1 (`Closes #1`)
-2. Claude : relire l'implementation TTL si une revue croisee est souhaitee
-3. Codex : passer ensuite a la feature #2 (Re-notification) dans une session separee
+1. Utilisateur / Claude : arbitrer l'evolution d'architecture sur le scheduling des echeances (TTL, re-notification, futur snooze)
+2. Codex : proposer le commit final de la feature #2 (`Closes #2`) et merger la branche dans `v1.1.0`
+3. Codex : reprendre l'implementation apres decision de scheduling si un refactoring transversal est retenu

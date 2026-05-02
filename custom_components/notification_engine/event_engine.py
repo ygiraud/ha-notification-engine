@@ -43,6 +43,19 @@ def normalize_ttl_hours(value: Any) -> float | None:
     return ttl_hours
 
 
+def normalize_renotify_minutes(value: Any) -> float | None:
+    """Normalize renotify_minutes to a positive float or None."""
+    if value in (None, ""):
+        return None
+    try:
+        renotify_minutes = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("renotify_minutes must be a positive number") from None
+    if renotify_minutes <= 0:
+        raise ValueError("renotify_minutes must be a positive number")
+    return renotify_minutes
+
+
 def ttl_remaining_seconds(
     created_at: Any,
     ttl_hours: Any,
@@ -58,6 +71,22 @@ def ttl_remaining_seconds(
     current_time = now or datetime.now(timezone.utc)
     expires_at = parsed_created_at.timestamp() + (normalized_ttl_hours * 3600)
     return max(0, int(expires_at - current_time.timestamp()))
+
+
+def normalize_notified_at(value: Any) -> dict[str, str]:
+    """Normalize per-person notification timestamps."""
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, str] = {}
+    for person, notified_at in value.items():
+        person_key = str(person).strip()
+        if not person_key:
+            continue
+        parsed_notified_at = parse_created_at(notified_at)
+        if parsed_notified_at is None:
+            continue
+        normalized[person_key] = parsed_notified_at.isoformat()
+    return normalized
 
 def parse_actions(value: Any) -> list[dict[str, str]]:
     """Parse actions from list/dict-like inputs, JSON or Python literal strings."""
@@ -138,6 +167,8 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
         resolved_recipients = []
     normalized["resolved_recipients"] = [str(person) for person in resolved_recipients if str(person)]
     normalized["ttl_hours"] = normalize_ttl_hours(normalized.get("ttl_hours"))
+    normalized["renotify_minutes"] = normalize_renotify_minutes(normalized.get("renotify_minutes"))
+    normalized["notified_at"] = normalize_notified_at(normalized.get("notified_at"))
     return normalized
 
 
@@ -152,6 +183,7 @@ def make_event(
     message: str = "",
     actions: list[dict[str, str]] | None = None,
     ttl_hours: float | None = None,
+    renotify_minutes: float | None = None,
 ) -> dict[str, Any]:
     """Create a new normalized pending event."""
     event_id = f"evt_{int(time.time())}_{uuid.uuid4().hex[:8]}"
@@ -173,7 +205,9 @@ def make_event(
             "resolved_recipients": resolved_recipients or [],
             "actions": actions or [],
             "ttl_hours": ttl_hours,
+            "renotify_minutes": renotify_minutes,
             "notified_people": [],
+            "notified_at": {},
             "history": [{"at": now, "action": "created"}],
         }
     )
@@ -241,11 +275,13 @@ class NotificationEventEngine:
         message: str = "",
         actions: list[dict[str, str]] | None = None,
         ttl_hours: float | None = None,
+        renotify_minutes: float | None = None,
     ) -> dict[str, Any]:
         """Create event with idempotent deduplication."""
         recipient_list = recipients or []
         action_list = actions or []
         normalized_ttl_hours = normalize_ttl_hours(ttl_hours)
+        normalized_renotify_minutes = normalize_renotify_minutes(renotify_minutes)
         events = self.load_events()
 
         for event in events:
@@ -260,6 +296,7 @@ class NotificationEventEngine:
                 and event.get("message", "") == message
                 and event.get("actions", []) == action_list
                 and event.get("ttl_hours") == normalized_ttl_hours
+                and event.get("renotify_minutes") == normalized_renotify_minutes
             ):
                 return {"created": False, "event": event}
 
@@ -274,6 +311,7 @@ class NotificationEventEngine:
             message=message,
             actions=action_list,
             ttl_hours=normalized_ttl_hours,
+            renotify_minutes=normalized_renotify_minutes,
         )
         events.append(event)
         self.save_events(events)
@@ -324,13 +362,16 @@ class NotificationEventEngine:
         for event in events:
             if event.get("id") != event_id:
                 continue
+            now = utc_now_iso()
             notified = event.setdefault("notified_people", [])
             if person not in notified:
-                now = utc_now_iso()
                 notified.append(person)
-                event["updated_at"] = now
-                event.setdefault("history", []).append({"at": now, "action": "notified", "person": person})
-                self.save_events(events)
+            notified_at = normalize_notified_at(event.get("notified_at"))
+            notified_at[person] = now
+            event["notified_at"] = notified_at
+            event["updated_at"] = now
+            event.setdefault("history", []).append({"at": now, "action": "notified", "person": person})
+            self.save_events(events)
             return event
         return None
 
