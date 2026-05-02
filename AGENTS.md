@@ -236,7 +236,7 @@ Implement in issue number order. Each feature is independent enough to be done i
 2. Re-notification (#2) — new scheduling logic for unacknowledged `asap` events
 3. `purge_events` filters (#3) — extends existing service with filter params
 4. `get_event` service (#4) — pure read-only service, no side effects
-5. `snooze` action (#5) — mobile action handler, defers event N minutes
+5. `snooze` action (#5) — mobile action handler, defers event N minutes (precision ensured by 1-min polling)
 
 ### Per-Feature Checklist
 

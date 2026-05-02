@@ -51,6 +51,8 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - `renotify_minutes` est optionnel, strictement positif, et est pris en compte pour toutes les strategies sauf `info`.
 - La re-notification est calculee par personne, a partir du dernier envoi enregistre, et cesse des que l'evenement n'est plus `pending`.
 - `renotify_minutes` definit un delai minimal avant re-emission. L'envoi effectif depend encore du prochain passage de `process_events`.
+- `DEFAULT_PROCESS_EVENTS_INTERVAL` passe de 5 minutes a 1 minute (`const.py`) pour donner une precision adequate a TTL, re-notification et futur snooze. Architecture polling conservee (pas de `async_track_point_in_time`) : simple, resiliente aux redemarrages HA, overhead negligeable.
+- `snooze` : architecture arbitree. Voir section "Architecture snooze (#5)" ci-dessous.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
 
@@ -58,12 +60,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 
 ## Risques ouverts
 
-- 🟡 `_attr_has_entity_name = True` sur `sensor.py` : non verifie sur instance HA reelle.
-- 🟡 `alert` payload critique : verifie par test unitaire uniquement, pas sur device iOS/Android reel.
-- ✅ Purge TTL et cleanup mobile verifies sur instance HA apres ajout du `timeout` et du traitement periodique.
-- 🟡 Sujet d'architecture ouvert: TTL, re-notification et futur snooze dependent tous d'echeances temporelles, mais le moteur reste base sur `process_events` + polling periodique. Precision et predictibilite a re-evaluer.
-- 🟡 Test HA concluant pour la re-notification, mais la precision du delai reste bornee par la cadence de `process_events` (actuellement 5 minutes si aucun autre declencheur n'arrive).
-- 🟡 `snooze` : necessite un mobile action handler dedie. Architecture a confirmer avant implementation (cf. AGENTS.md Per-Feature Checklist).
+- 🟡 `alert` payload critique : valide sur iOS (Critical Alerts + Focus bypass OK). Non verifie sur Android (`alarm_stream` + DND bypass a tester).
 
 ---
 
@@ -120,8 +117,42 @@ tests/
 
 ---
 
+## Architecture snooze (#5)
+
+### Declenchement
+
+L'utilisateur ajoute une action de pattern `SNOOZE_<N>` dans le champ `actions` de `create_event` (N = minutes) :
+
+```yaml
+actions: '[{"action":"SNOOZE_30","title":"🔕 30 min"},{"action":"DONE","title":"✅ Fait"}]'
+```
+
+Le listener `mobile_app_notification_action` existant detecte les actions matchant `SNOOZE_\d+`, extrait N, et appelle `engine.snooze_event(tag, person_entity, minutes=N)`. Aucun nouveau champ sur `create_event`.
+
+### Modele de donnees
+
+Nouveau champ `snoozed_until` dans l'evenement : dict par personne, calque sur `notified_at`.
+
+```json
+{
+  "snoozed_until": {
+    "person.alice": "2026-05-02T10:30:00+00:00"
+  }
+}
+```
+
+### Comportement dans `process_events`
+
+Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres expiration, la notification repart normalement.
+
+### Interactions
+
+- **Re-notification** : quand le snooze expire et que la notification repart, `notified_at[person]` est mis a jour. Le timer de re-notification repart de zero.
+- **TTL** : la purge TTL s'execute en premier. Un evenement expire ne sera jamais snooze-traite. TTL gagne toujours.
+- **Perimetre** : snooze par personne. Alice qui snooze n'affecte pas Bob.
+
+---
+
 ## Next Steps
 
-1. Utilisateur / Claude : arbitrer l'evolution d'architecture sur le scheduling des echeances (TTL, re-notification, futur snooze)
-2. Codex : proposer le commit final de la feature #2 (`Closes #2`) et merger la branche dans `v1.1.0`
-3. Codex : reprendre l'implementation apres decision de scheduling si un refactoring transversal est retenu
+1. Codex : continuer avec la feature #3 (`purge_events` filters)
