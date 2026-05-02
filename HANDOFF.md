@@ -4,7 +4,7 @@
 
 - Name: Codex
 - Date: 2026-05-02 Europe/Paris (UTC+2)
-- Context: Feature v1.1 #3 implemented: `purge_events` accepte des filtres optionnels `strategy`, `status`, `older_than_hours`.
+- Context: Feature v1.1 #4 implemented: nouveau service read-only `get_event` par `key` ou `id`.
 
 ---
 
@@ -32,7 +32,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 | 1 | Event TTL | #1 | completed |
 | 2 | Re-notification | #2 | completed |
 | 3 | `purge_events` filters | #3 | completed |
-| 4 | `get_event` service | #4 | pending |
+| 4 | `get_event` service | #4 | completed |
 | 5 | `snooze` action | #5 | pending |
 
 ---
@@ -55,6 +55,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - `purge_events` conserve son comportement historique sans filtre (purge totale), mais accepte maintenant des filtres optionnels combines en mode `AND` sur `strategy`, `status` et `older_than_hours`.
 - `older_than_hours` est optionnel et doit etre strictement positif. Valeur invalide -> erreur de service `invalid_older_than_hours`.
 - Avec un filtre `older_than_hours`, un evenement sans `created_at` exploitable n'est pas purge.
+- `get_event` est un service read-only. Par `id`, il retourne l'evenement exact. Par `key`, il retourne le premier evenement `pending` correspondant, pour rester coherent avec `delete_event`.
 - `snooze` : architecture arbitree. Voir section "Architecture snooze (#5)" ci-dessous.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
@@ -111,6 +112,12 @@ tests/
 - Tests unitaires ajoutes pour la validation de `older_than_hours`, la purge selective et le cas d'un `created_at` invalide.
 - Verification syntaxique OK via `python3 -m py_compile`.
 - `pytest` indisponible dans l'environnement courant (`pytest` absent du PATH et du Python systeme), donc tests unitaires non executes ici.
+- Ajout de la constante `SERVICE_GET_EVENT` et enregistrement du nouveau service HA `notification_engine.get_event`.
+- Ajout des methodes `get_event()` et `get_event_by_key()` dans `event_engine.py`.
+- Ajout du handler `async_get_event()` dans `services.py`, avec contrat d'erreur coherent: `missing_key_or_id` et `event_not_found`.
+- Documentation du service `get_event` ajoutee dans `services.yaml`.
+- Tests unitaires ajoutes pour la recherche par `key`, par `id` et les erreurs du service.
+- Tests executes avec succes: `pytest tests/test_event_engine.py` -> `30 passed`.
 
 ---
 
@@ -165,4 +172,4 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 
 ## Next Steps
 
-1. Codex : continuer avec la feature #4 (`get_event` service)
+1. Codex : continuer avec la feature #5 (`snooze` action)

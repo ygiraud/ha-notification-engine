@@ -6,6 +6,7 @@ DOMAIN = "notification_engine"
 EVENTS_FILENAME = "notification_engine_events.json"
 
 SERVICE_CREATE_EVENT = "create_event"
+SERVICE_GET_EVENT = "get_event"
 SERVICE_LIST_EVENTS = "list_events"
 SERVICE_PROCESS_EVENTS = "process_events"
 SERVICE_SEND_INFO = "send_info"

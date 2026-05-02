@@ -28,6 +28,7 @@ from .const import (
     EVENTS_FILENAME,
     SERVICE_CREATE_EVENT,
     SERVICE_DELETE_EVENT,
+    SERVICE_GET_EVENT,
     SERVICE_LIST_EVENTS,
     SERVICE_PROCESS_EVENTS,
     SERVICE_PURGE_EVENTS,
@@ -227,6 +228,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.bus.async_listen("state_changed", handler.async_on_state_changed)
 
     hass.services.async_register(DOMAIN, SERVICE_CREATE_EVENT, handler.async_create_event, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_GET_EVENT, handler.async_get_event, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_LIST_EVENTS, handler.async_list_events, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_SEND_INFO, handler.async_send_info, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_PROCESS_EVENTS, handler.async_process_events, supports_response=SupportsResponse.OPTIONAL)
