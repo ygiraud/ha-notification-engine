@@ -45,6 +45,52 @@ class HomeAssistantError(Exception):
 homeassistant_exceptions.HomeAssistantError = HomeAssistantError
 sys.modules.setdefault("homeassistant.exceptions", homeassistant_exceptions)
 
+homeassistant_core = types.ModuleType("homeassistant.core")
+
+
+class Event:
+    """Minimal Home Assistant Event stub for pure unit tests."""
+
+
+class HomeAssistant:
+    """Minimal Home Assistant stub for type imports."""
+
+
+class ServiceCall:
+    """Minimal ServiceCall stub with data and target."""
+
+    def __init__(self, data=None, target=None) -> None:
+        self.data = data or {}
+        self.target = target
+
+
+ServiceResponse = dict
+
+homeassistant_core.Event = Event
+homeassistant_core.HomeAssistant = HomeAssistant
+homeassistant_core.ServiceCall = ServiceCall
+homeassistant_core.ServiceResponse = ServiceResponse
+sys.modules.setdefault("homeassistant.core", homeassistant_core)
+
+homeassistant_helpers = types.ModuleType("homeassistant.helpers")
+homeassistant_helpers.__path__ = []
+sys.modules.setdefault("homeassistant.helpers", homeassistant_helpers)
+
+homeassistant_helpers_update_coordinator = types.ModuleType(
+    "homeassistant.helpers.update_coordinator"
+)
+
+
+class DataUpdateCoordinator:
+    """Minimal coordinator stub for type imports."""
+
+
+homeassistant_helpers_update_coordinator.DataUpdateCoordinator = DataUpdateCoordinator
+sys.modules.setdefault(
+    "homeassistant.helpers.update_coordinator",
+    homeassistant_helpers_update_coordinator,
+)
+
 _load_module("custom_components.notification_engine.const", PACKAGE_DIR / "const.py")
 EVENT_ENGINE_MODULE = _load_module(
     "custom_components.notification_engine.event_engine",
@@ -54,12 +100,17 @@ DELIVERY_MODULE = _load_module(
     "custom_components.notification_engine.delivery",
     PACKAGE_DIR / "delivery.py",
 )
+SERVICES_MODULE = _load_module(
+    "custom_components.notification_engine.services",
+    PACKAGE_DIR / "services.py",
+)
 
 NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
 send_to_notify = DELIVERY_MODULE.send_to_notify
+extract_target_entities = SERVICES_MODULE._extract_target_entities
 
 
 def test_parse_actions_accepts_json_and_python_literal() -> None:
@@ -73,6 +124,18 @@ def test_parse_actions_accepts_json_and_python_literal() -> None:
         {"action": "DONE", "title": "OK"},
         {"action": "OPEN", "title": "Open"},
     ]
+
+
+def test_extract_target_entities_supports_data_entity_id_and_target_dict() -> None:
+    assert extract_target_entities(
+        ServiceCall(data={"entity_id": ["person.yoan", "person.magalie"]})
+    ) == ["person.yoan", "person.magalie"]
+    assert extract_target_entities(
+        ServiceCall(target={"entity_id": ["person.yoan"]})
+    ) == ["person.yoan"]
+    assert extract_target_entities(
+        ServiceCall(data={"target": {"entity_id": "person.yoan"}})
+    ) == ["person.yoan"]
 
 
 def test_parse_actions_ignores_invalid_payloads() -> None:

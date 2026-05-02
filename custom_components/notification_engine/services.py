@@ -62,9 +62,14 @@ def _normalize_entities(value: Any) -> list[str]:
     return []
 
 
-def _extract_target_entities(data: dict[str, Any]) -> list[str]:
+def _extract_target_entities(call: ServiceCall) -> list[str]:
     """Extract recipient entity ids from the HA service call target field."""
-    return _normalize_entities(data.get("target"))
+    data = call.data if isinstance(call.data, dict) else {}
+    if data.get("target") is not None:
+        return _normalize_entities(data.get("target"))
+    if data.get("entity_id") is not None:
+        return _normalize_entities(data.get("entity_id"))
+    return _normalize_entities(getattr(call, "target", None))
 
 
 class NotificationEngineServices:
@@ -95,7 +100,7 @@ class NotificationEngineServices:
 
     async def async_create_event(self, call: ServiceCall) -> ServiceResponse:
         """Create a notification event and trigger immediate delivery."""
-        explicit_recipients = _extract_target_entities(call.data)
+        explicit_recipients = _extract_target_entities(call)
         resolved_recipients = event_recipients(
             {"recipients": explicit_recipients}, people_config(self._domain_data)
         )
@@ -125,9 +130,7 @@ class NotificationEngineServices:
         title = str(call.data.get("title", ""))
         message = str(call.data.get("message", ""))
         people = people_config(self._domain_data)
-        recipients = event_recipients(
-            {"recipients": _extract_target_entities(call.data)}, people
-        )
+        recipients = event_recipients({"recipients": _extract_target_entities(call)}, people)
         sent = 0
         for person in recipients:
             person_cfg = people.get(person, {})

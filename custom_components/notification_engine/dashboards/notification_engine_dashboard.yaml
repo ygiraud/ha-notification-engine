@@ -331,6 +331,12 @@ views:
                     tap_action:
                       action: perform-action
                       perform_action: notification_engine.create_event
+                      target:
+                        entity_id: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
                       data:
                         key: test_dashboard_notifications
                         strategy: alert
@@ -338,12 +344,6 @@ views:
                         context_label: Test dashboard
                         title: 🚨🧪 Test notification
                         message: Notification de test
-                        target:
-                          entity_id: |-
-                            [[[
-                              const raw = states['text.notification_engine_test_targets']?.state || '';
-                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -356,6 +356,12 @@ views:
                     tap_action:
                       action: perform-action
                       perform_action: notification_engine.create_event
+                      target:
+                        entity_id: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
                       data:
                         key: test_dashboard_notifications
                         strategy: present
@@ -363,12 +369,6 @@ views:
                         context_label: Test dashboard
                         title: 👀🧪 Test notification
                         message: Notification de test
-                        target:
-                          entity_id: |-
-                            [[[
-                              const raw = states['text.notification_engine_test_targets']?.state || '';
-                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -381,6 +381,12 @@ views:
                     tap_action:
                       action: perform-action
                       perform_action: notification_engine.create_event
+                      target:
+                        entity_id: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
                       data:
                         key: test_dashboard_notifications
                         strategy: asap
@@ -388,12 +394,6 @@ views:
                         context_label: Test dashboard
                         title: ⏱️🧪 Test notification
                         message: Notification de test
-                        target:
-                          entity_id: |-
-                            [[[
-                              const raw = states['text.notification_engine_test_targets']?.state || '';
-                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -406,6 +406,12 @@ views:
                     tap_action:
                       action: perform-action
                       perform_action: notification_engine.create_event
+                      target:
+                        entity_id: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
                       data:
                         key: test_dashboard_notifications
                         strategy: away_reminder
@@ -413,12 +419,6 @@ views:
                         context_label: Test dashboard
                         title: 🔙🧪 Test notification
                         message: Notification de test
-                        target:
-                          entity_id: |-
-                            [[[
-                              const raw = states['text.notification_engine_test_targets']?.state || '';
-                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                            ]]]
                         actions:
                           - action: DONE
                             title: OK
@@ -431,6 +431,12 @@ views:
                     tap_action:
                       action: perform-action
                       perform_action: notification_engine.create_event
+                      target:
+                        entity_id: |-
+                          [[[
+                            const raw = states['text.notification_engine_test_targets']?.state || '';
+                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                          ]]]
                       data:
                         key: test_dashboard_notifications
                         strategy: info
@@ -438,12 +444,6 @@ views:
                         context_label: Test dashboard
                         title: ℹ️🧪 Test info
                         message: Notification d'information
-                        target:
-                          entity_id: |-
-                            [[[
-                              const raw = states['text.notification_engine_test_targets']?.state || '';
-                              return raw.split(',').map((s) => s.trim()).filter(Boolean);
-                            ]]]
                         actions:
                           - action: DONE
                             title: OK
