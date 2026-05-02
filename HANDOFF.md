@@ -4,7 +4,7 @@
 
 - Name: Codex
 - Date: 2026-05-05 Europe/Paris (UTC+2)
-- Context: Feature v1.1 #1 validee sur instance HA, puis stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True` et ajout des consignes `graphify` dans la documentation agent.
+- Context: Features v1.1 #1 et #2 validees sur HA, puis stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True` et ajout des consignes `graphify` dans la documentation agent.
 
 ---
 
@@ -17,12 +17,14 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 ## Completed Work
 
 - ✅ Feature v1.1 #1 (TTL) terminee et validee sur instance HA
-- ✅ `custom_components/notification_engine/event_engine.py` : ajout de `ttl_hours`, purge TTL selective et timeout mobile calcule sur le TTL restant
-- ✅ `custom_components/notification_engine/services.py` : validation stricte de `ttl_hours` et integration dans les handlers de services
+- ✅ Feature v1.1 #2 (Re-notification) terminee et testee sur instance HA
+- ✅ `custom_components/notification_engine/event_engine.py` : ajout de `ttl_hours`, `renotify_minutes`, purge TTL selective, timeout mobile calcule sur le TTL restant et re-notification basee sur les derniers envois par personne
+- ✅ `custom_components/notification_engine/services.py` : validation stricte de `ttl_hours` et `renotify_minutes`, integration dans les handlers de services
 - ✅ `custom_components/notification_engine/__init__.py` : traitement periodique de `process_events` toutes les 5 minutes et synchronisation dashboard ajustee
 - ✅ `custom_components/notification_engine/delivery.py` : cleanup mobile pour les evenements expires
-- ✅ `custom_components/notification_engine/services.yaml` : documentation du champ `ttl_hours`
-- ✅ `tests/test_event_engine.py` : tests TTL, purge selective, timeout mobile et integration dans `process_events`
+- ✅ `custom_components/notification_engine/services.yaml` : documentation des champs `ttl_hours` et `renotify_minutes`
+- ✅ `tests/test_event_engine.py` : tests TTL, purge selective, timeout mobile, re-notification et integration dans `process_events`
+- ✅ Test unitaire ajoute pour garantir qu'un evenement `info` ne declenche jamais de re-notification, meme avec `renotify_minutes`
 - ✅ `custom_components/notification_engine/__init__.py` : resolution du vrai `entity_id` du sensor via l'entity registry a partir du `unique_id`
 - ✅ Installation du dashboard YAML templatisee avec injection du vrai `entity_id` du sensor d'evenements
 - ✅ `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` : remplacement du hardcode `sensor.notifications_evenements` par un placeholder injecte a l'installation
@@ -58,8 +60,11 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - `pytest-homeassistant-custom-component` : REPORTE. Trop lourd pour ce projet.
 - `alert` bypass DND : iOS critical + Android `alarm_stream`. Semantique "alerte = critique" sans flag supplementaire.
 - `ttl_hours` est optionnel et doit etre strictement positif. Valeur invalide -> erreur de service `invalid_ttl_hours`.
+- `renotify_minutes` est optionnel, strictement positif, et est pris en compte pour toutes les strategies sauf `info`.
 - La purge TTL s'applique uniquement aux evenements `pending` et se declenche au debut de `process_events`.
 - Les evenements expires suppriment aussi leur `tag` de notification sur les devices configures.
+- La re-notification est calculee par personne, a partir du dernier envoi enregistre, et cesse des que l'evenement n'est plus `pending`.
+- `renotify_minutes` definit un delai minimal avant re-emission. L'envoi effectif depend encore du prochain passage de `process_events`.
 - `process_events` est maintenant aussi declenche periodiquement toutes les 5 minutes pour rendre le TTL utile sans action manuelle.
 - Les notifications envoyees pour un evenement avec TTL embarquent aussi un `timeout` mobile calcule sur le TTL restant.
 - `has_entity_name = True` est conserve pour le sensor.
@@ -79,6 +84,8 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - 🟡 `_attr_has_entity_name = True` sur `sensor.py` : non verifie sur instance HA reelle.
 - 🟡 `alert` payload critique : verifie par test unitaire uniquement, pas sur device iOS/Android reel.
 - ✅ Purge TTL et cleanup mobile verifies sur instance HA apres ajout du `timeout` et du traitement periodique.
+- 🟡 Sujet d'architecture ouvert: TTL, re-notification et futur snooze dependent tous d'echeances temporelles, mais le moteur reste base sur `process_events` + polling periodique. Precision et predictibilite a re-evaluer.
+- 🟡 Test HA concluant pour la re-notification, mais la precision du delai reste bornee par la cadence de `process_events` (actuellement 5 minutes si aucun autre declencheur n'arrive).
 - 🟡 `snooze` : necessite un mobile action handler dedie. Architecture a confirmer avant implementation (cf. AGENTS.md Per-Feature Checklist).
 - 🟡 Sur une installation existante, l'entity registry peut conserver un ancien `entity_id` ou un slug different selon l'historique local. Le dashboard suivra ce `entity_id` reel apres reinstallation / resynchronisation, mais ce comportement n'a pas ete verifie sur instance HA reelle ici.
 - 🟡 Si la resolution par `unique_id` echoue au moment de l'installation du dashboard, fallback sur `sensor.notifications_evenements`. Ce fallback evite un fichier vide mais peut rester faux sur certaines installations atypiques.
@@ -102,7 +109,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 | # | Feature | GitHub Issue | Status |
 |---|---|---|---|
 | 1 | Event TTL | #1 | completed |
-| 2 | Re-notification | #2 | pending |
+| 2 | Re-notification | #2 | completed |
 | 3 | `purge_events` filters | #3 | pending |
 | 4 | `get_event` service | #4 | pending |
 | 5 | `snooze` action | #5 | pending |
@@ -132,7 +139,6 @@ tests/
 
 ## Next Steps
 
-1. Utilisateur : terminer le rebase et verifier que l'etat Git est propre
-2. Utilisateur : valider le commit final de la feature #1 (`Closes #1`) si ce n'est pas deja fait apres le rebase
-3. Claude : relire l'implementation TTL si une revue croisee est souhaitee
-4. Codex : passer ensuite a la feature #2 (Re-notification) dans une session separee
+1. Utilisateur / Claude : arbitrer si l'architecture de scheduling doit evoluer pour TTL, re-notification et futur snooze
+2. Utilisateur : terminer le rebase et verifier que l'etat Git est propre
+3. Codex : passer ensuite a la feature #3 (`purge_events` filters) dans une session separee si aucun refactoring transversal n'est retenu

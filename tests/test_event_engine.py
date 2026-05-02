@@ -108,10 +108,12 @@ SERVICES_MODULE = _load_module(
 
 NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
+normalize_renotify_minutes = EVENT_ENGINE_MODULE.normalize_renotify_minutes
 parse_actions = EVENT_ENGINE_MODULE.parse_actions
 process_events_core = DELIVERY_MODULE.process_events_core
 select_nearest_recipients = DELIVERY_MODULE.select_nearest_recipients
 send_to_notify = DELIVERY_MODULE.send_to_notify
+should_renotify_person = DELIVERY_MODULE.should_renotify_person
 extract_target_entities = SERVICES_MODULE._extract_target_entities
 ttl_remaining_seconds = EVENT_ENGINE_MODULE.ttl_remaining_seconds
 
@@ -176,6 +178,19 @@ def test_ttl_remaining_seconds_returns_zero_once_expired() -> None:
         1,
         now,
     ) == 0
+
+
+def test_normalize_renotify_minutes_requires_positive_number() -> None:
+    assert normalize_renotify_minutes(None) is None
+    assert normalize_renotify_minutes("") is None
+    assert normalize_renotify_minutes(30) == 30.0
+
+    try:
+        normalize_renotify_minutes(0)
+    except ValueError as exc:
+        assert str(exc) == "renotify_minutes must be a positive number"
+    else:
+        raise AssertionError("Expected ValueError for renotify_minutes=0")
 
 
 def test_select_nearest_recipients_uses_tolerance_and_fallback() -> None:
@@ -347,6 +362,37 @@ def test_create_event_stores_ttl_hours_and_deduplicates_on_it(tmp_path) -> None:
     assert len(engine.load_events()) == 2
 
 
+def test_create_event_stores_renotify_minutes_and_deduplicates_on_it(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    first = engine.create_event(
+        key="door",
+        strategy="asap",
+        title="Door",
+        message="Open",
+        renotify_minutes=30,
+    )
+    duplicate = engine.create_event(
+        key="door",
+        strategy="asap",
+        title="Door",
+        message="Open",
+        renotify_minutes=30,
+    )
+    distinct = engine.create_event(
+        key="door",
+        strategy="asap",
+        title="Door",
+        message="Open",
+        renotify_minutes=60,
+    )
+
+    assert first["event"]["renotify_minutes"] == 30.0
+    assert duplicate["created"] is False
+    assert distinct["created"] is True
+    assert len(engine.load_events()) == 2
+
+
 def test_create_event_rejects_non_positive_ttl_hours(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
 
@@ -376,7 +422,7 @@ def test_delete_event_by_key_deletes_first_pending_match_only(tmp_path) -> None:
     assert [event["id"] for event in engine.load_events()] == [second["id"], third["id"]]
 
 
-def test_notify_person_updates_history_once(tmp_path) -> None:
+def test_notify_person_updates_timestamp_and_appends_history_for_resend(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
     created = engine.create_event(key="alarm", title="Alarm", message="Triggered")
     event_id = created["event"]["id"]
@@ -387,7 +433,8 @@ def test_notify_person_updates_history_once(tmp_path) -> None:
     stored = engine.load_events()[0]
     notified_entries = [item for item in stored["history"] if item.get("action") == "notified"]
     assert stored["notified_people"] == ["person.alice"]
-    assert len(notified_entries) == 1
+    assert stored["notified_at"]["person.alice"]
+    assert len(notified_entries) == 2
 
 
 def test_create_event_keeps_explicit_recipients_empty_but_stores_resolved_fallback(tmp_path) -> None:
@@ -595,3 +642,236 @@ def test_process_events_core_sets_mobile_timeout_from_remaining_ttl(tmp_path) ->
     notify_payload = hass.services.calls[0][2]
     assert notify_payload["data"]["timeout"] > 1700
     assert notify_payload["data"]["timeout"] <= 1800
+
+
+def test_should_renotify_person_only_when_delay_elapsed() -> None:
+    now = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+    event = {
+        "renotify_minutes": 30,
+        "notified_at": {"person.alice": "2026-05-02T06:20:00+00:00"},
+    }
+
+    assert should_renotify_person(event, "person.alice", now) is True
+    assert should_renotify_person(event, "person.bob", now) is False
+    assert should_renotify_person(
+        {
+            "renotify_minutes": 30,
+            "notified_at": {"person.alice": "2026-05-02T06:40:00+00:00"},
+        },
+        "person.alice",
+        now,
+    ) is False
+
+
+def test_process_events_core_renotifies_unacknowledged_asap_after_delay(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="renotify",
+        strategy="asap",
+        title="Reminder",
+        message="Do the thing",
+        recipients=["person.alice"],
+        renotify_minutes=30,
+    )["event"]
+
+    class _State:
+        def __init__(self, state: str) -> None:
+            self.state = state
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            if entity_id == "person.alice":
+                return _State("home")
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    first = asyncio.run(process_events_core(hass, domain_data))
+    second = asyncio.run(process_events_core(hass, domain_data))
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == created["id"]:
+            event["notified_at"]["person.alice"] = (now - timedelta(minutes=31)).isoformat()
+    engine.save_events(events)
+
+    third = asyncio.run(process_events_core(hass, domain_data))
+    stored = engine.load_events()[0]
+    notified_entries = [item for item in stored["history"] if item.get("action") == "notified"]
+
+    assert first == {"ok": True, "sent": 1}
+    assert second == {"ok": True, "sent": 0}
+    assert third == {"ok": True, "sent": 1}
+    assert len(hass.services.calls) == 2
+    assert stored["notified_people"] == ["person.alice"]
+    assert len(notified_entries) == 2
+
+
+def test_process_events_core_renotifies_alert_after_delay(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="renotify-alert",
+        strategy="alert",
+        title="Critical reminder",
+        message="Still pending",
+        recipients=["person.alice"],
+        renotify_minutes=30,
+    )["event"]
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    first = asyncio.run(process_events_core(hass, domain_data))
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == created["id"]:
+            event["notified_at"]["person.alice"] = (now - timedelta(minutes=31)).isoformat()
+    engine.save_events(events)
+
+    second = asyncio.run(process_events_core(hass, domain_data))
+
+    assert first == {"ok": True, "sent": 1}
+    assert second == {"ok": True, "sent": 1}
+    assert len(hass.services.calls) == 2
+
+
+def test_process_events_core_info_never_renotifies_even_if_configured(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="renotify-info",
+        strategy="info",
+        title="FYI",
+        message="Just so you know",
+        recipients=["person.alice"],
+        renotify_minutes=1,
+    )["event"]
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def get(self, entity_id: str):
+            return None
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    events = engine.load_events()
+    now = datetime.now(timezone.utc)
+    for event in events:
+        if event["id"] == created["id"]:
+            event["notified_people"] = ["person.alice"]
+            event["notified_at"] = {
+                "person.alice": (now - timedelta(minutes=2)).isoformat()
+            }
+            event["history"].append(
+                {
+                    "at": now.isoformat(),
+                    "action": "notified",
+                    "person": "person.alice",
+                }
+            )
+    engine.save_events(events)
+
+    hass = _Hass()
+    domain_data = {
+        "engine": engine,
+        "people": {
+            "person.alice": {
+                "notify_service": "notify.mobile_app_alice",
+                "enabled": True,
+            }
+        },
+    }
+
+    first = asyncio.run(process_events_core(hass, domain_data))
+    second = asyncio.run(process_events_core(hass, domain_data))
+
+    assert first == {"ok": True, "sent": 0}
+    assert second == {"ok": True, "sent": 0}
+    assert hass.services.calls == []
+    assert engine.load_events() == []

@@ -17,7 +17,12 @@ from .const import (
     DEFAULT_AWAY_REMINDER_MODE,
     DEFAULT_AWAY_REMINDER_TOLERANCE_M,
 )
-from .event_engine import NotificationEventEngine, ttl_remaining_seconds
+from .event_engine import (
+    NotificationEventEngine,
+    normalize_renotify_minutes,
+    parse_created_at,
+    ttl_remaining_seconds,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,6 +85,21 @@ def is_home(hass: Any, person_entity: str) -> bool:
     """Return whether the person entity is currently home."""
     state = hass.states.get(person_entity)
     return state is not None and state.state == "home"
+
+
+def should_renotify_person(event: dict[str, Any], person: str, now: datetime) -> bool:
+    """Return whether one pending event should be re-notified for one person."""
+    renotify_minutes = normalize_renotify_minutes(event.get("renotify_minutes"))
+    if renotify_minutes is None:
+        return False
+    notified_at = event.get("notified_at", {})
+    if not isinstance(notified_at, dict):
+        return False
+    last_notified_at = parse_created_at(notified_at.get(person))
+    if last_notified_at is None:
+        return False
+    due_at = last_notified_at.timestamp() + (renotify_minutes * 60)
+    return due_at <= now.timestamp()
 
 
 def select_nearest_recipients(
@@ -260,7 +280,9 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
             selected = []
 
         for person in selected:
-            if person in notified:
+            if person in notified and not (
+                strategy != "info" and should_renotify_person(event, person, now)
+            ):
                 continue
             person_cfg = people.get(person, {})
             if not person_enabled(person_cfg):
