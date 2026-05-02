@@ -167,6 +167,26 @@ class NotificationEngineServices:
         events = await self._hass.async_add_executor_job(self._engine.load_events)
         return {"ok": True, "events": events}
 
+    async def async_get_event(self, call: ServiceCall) -> ServiceResponse:
+        """Return one event by logical key (recommended) or internal id."""
+        key = str(call.data.get("key", "")).strip()
+        event_id = str(call.data.get("id", "")).strip()
+        if key:
+            event_obj = await self._hass.async_add_executor_job(
+                self._engine.get_event_by_key, key
+            )
+            lookup = key
+        elif event_id:
+            event_obj = await self._hass.async_add_executor_job(
+                self._engine.get_event, event_id
+            )
+            lookup = event_id
+        else:
+            return {"ok": False, "error": "missing_key_or_id"}
+        if event_obj is None:
+            return {"ok": False, "error": "event_not_found", "lookup": lookup}
+        return {"ok": True, "event": event_obj}
+
     async def async_send_info(self, call: ServiceCall) -> ServiceResponse:
         """Send a transient notification without creating a persistent event."""
         title = str(call.data.get("title", ""))

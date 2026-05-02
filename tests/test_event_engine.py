@@ -107,6 +107,7 @@ SERVICES_MODULE = _load_module(
 )
 
 NotificationEventEngine = EVENT_ENGINE_MODULE.NotificationEventEngine
+NotificationEngineServices = SERVICES_MODULE.NotificationEngineServices
 build_mobile_actions = EVENT_ENGINE_MODULE.build_mobile_actions
 normalize_older_than_hours = EVENT_ENGINE_MODULE.normalize_older_than_hours
 normalize_renotify_minutes = EVENT_ENGINE_MODULE.normalize_renotify_minutes
@@ -431,6 +432,55 @@ def test_delete_event_by_key_deletes_first_pending_match_only(tmp_path) -> None:
 
     assert missing is None
     assert [event["id"] for event in engine.load_events()] == [second["id"], third["id"]]
+
+
+def test_get_event_by_key_returns_first_pending_match_only(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    first = engine.create_event(key="door", title="Door", message="Open")["event"]
+    second = engine.create_event(key="window", title="Window", message="Open")["event"]
+    third = engine.create_event(key="door", title="Door", message="Still open")["event"]
+
+    engine.ack_event(first["id"], "done")
+
+    found = engine.get_event_by_key("door")
+    missing = engine.get_event_by_key("unknown")
+
+    assert found is not None
+    assert found["id"] == third["id"]
+    assert engine.get_event(second["id"]) is not None
+    assert missing is None
+
+
+def test_async_get_event_returns_by_key_or_id_and_errors(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    first = engine.create_event(key="door", title="Door", message="Open")["event"]
+    second = engine.create_event(key="door", title="Door", message="Still open")["event"]
+    engine.ack_event(first["id"], "done")
+
+    class _Coordinator:
+        async def async_request_refresh(self) -> None:
+            return None
+
+    class _Hass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    handler = NotificationEngineServices(
+        _Hass(),
+        {"people": {}},
+        engine,
+        _Coordinator(),
+    )
+
+    by_key = asyncio.run(handler.async_get_event(ServiceCall(data={"key": "door"})))
+    by_id = asyncio.run(handler.async_get_event(ServiceCall(data={"id": first["id"]})))
+    missing_lookup = asyncio.run(handler.async_get_event(ServiceCall(data={"key": "unknown"})))
+    missing_params = asyncio.run(handler.async_get_event(ServiceCall(data={})))
+
+    assert by_key == {"ok": True, "event": engine.get_event(second["id"])}
+    assert by_id == {"ok": True, "event": engine.get_event(first["id"])}
+    assert missing_lookup == {"ok": False, "error": "event_not_found", "lookup": "unknown"}
+    assert missing_params == {"ok": False, "error": "missing_key_or_id"}
 
 
 def test_notify_person_updates_timestamp_and_appends_history_for_resend(tmp_path) -> None:

@@ -431,6 +431,22 @@ class NotificationEventEngine:
         self.save_events(kept)
         return deleted_event
 
+    def get_event(self, event_id: str) -> dict[str, Any] | None:
+        """Return one event by internal id."""
+        events = self.load_events()
+        for event in events:
+            if event.get("id") == event_id:
+                return event
+        return None
+
+    def get_event_by_key(self, key: str) -> dict[str, Any] | None:
+        """Return the first pending event matching a logical key."""
+        events = self.load_events()
+        for event in events:
+            if event.get("key") == key and event.get("status") == "pending":
+                return event
+        return None
+
     def purge_events(
         self,
         strategy: str | None = None,

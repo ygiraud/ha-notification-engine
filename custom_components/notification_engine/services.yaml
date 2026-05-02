@@ -83,6 +83,24 @@ list_events:
   name: List events
   description: Return all events.
 
+get_event:
+  name: Get event
+  description: Return one event by logical key (recommended) or internal id.
+  fields:
+    key:
+      name: Event key
+      description: Logical key used when the event was created. Takes priority over id.
+      required: false
+      example: "washing_machine_done"
+      selector:
+        text:
+    id:
+      name: Event id
+      description: Internal event id (evt_xxx). Use key instead when possible.
+      required: false
+      selector:
+        text:
+
 send_info:
   name: Send info
   description: Send an immediate notification without creating an event.
