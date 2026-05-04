@@ -182,6 +182,7 @@ class NotificationEngineServices:
             str(call.data.get("strategy", "")),
             str(call.data.get("title", "")),
             str(call.data.get("message", "")),
+            str(call.data.get("image_url", "")),
             parse_actions(call.data.get("actions", [])),
             ttl_hours,
             renotify_minutes,
@@ -219,6 +220,7 @@ class NotificationEngineServices:
         """Send a transient notification without creating a persistent event."""
         title = str(call.data.get("title", ""))
         message = str(call.data.get("message", ""))
+        image_url = str(call.data.get("image_url", ""))
         people = people_config(self._domain_data)
         recipients = event_recipients({"recipients": _extract_target_entities(call)}, people)
         sent = 0
@@ -236,6 +238,7 @@ class NotificationEngineServices:
                 message=message,
                 tag=f"info_{person}",
                 actions=[],
+                image_url=image_url,
                 strategy="info",
             )
             sent += 1

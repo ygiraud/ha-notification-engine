@@ -49,6 +49,13 @@ create_event:
       required: true
       selector:
         text:
+    image_url:
+      name: Image URL
+      description: Optional image URL or /local/ path forwarded to the mobile app payload.
+      required: false
+      example: "/local/notification_engine/washing_machine.jpg"
+      selector:
+        text:
     actions:
       name: Actions
       description: JSON array with action/title objects.
@@ -116,6 +123,13 @@ send_info:
     message:
       name: Message
       required: true
+      selector:
+        text:
+    image_url:
+      name: Image URL
+      description: Optional image URL or /local/ path forwarded to the mobile app payload.
+      required: false
+      example: "/local/notification_engine/info.jpg"
       selector:
         text:
 

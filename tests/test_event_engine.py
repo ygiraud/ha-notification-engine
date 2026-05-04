@@ -282,6 +282,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
             message="Immediate action required",
             tag="alert-tag",
             actions=[],
+            image_url="/local/alert.jpg",
             strategy="alert",
             timeout_seconds=45,
         )
@@ -304,6 +305,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
 
     assert alert_payload["data"]["ttl"] == 0
     assert alert_payload["data"]["timeout"] == 45
+    assert alert_payload["data"]["image"] == "/local/alert.jpg"
     assert alert_payload["data"]["priority"] == "high"
     assert alert_payload["data"]["channel"] == "alarm_stream"
     assert alert_payload["data"]["push"] == {
@@ -371,6 +373,34 @@ def test_create_event_stores_ttl_hours_and_deduplicates_on_it(tmp_path) -> None:
     distinct = engine.create_event(key="door", title="Door", message="Open", ttl_hours=3)
 
     assert first["event"]["ttl_hours"] == 2.0
+    assert duplicate["created"] is False
+    assert distinct["created"] is True
+    assert len(engine.load_events()) == 2
+
+
+def test_create_event_stores_image_url_and_deduplicates_on_it(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    first = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-open.jpg",
+    )
+    duplicate = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-open.jpg",
+    )
+    distinct = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-closed.jpg",
+    )
+
+    assert first["event"]["image_url"] == "/local/door-open.jpg"
     assert duplicate["created"] is False
     assert distinct["created"] is True
     assert len(engine.load_events()) == 2
@@ -483,6 +513,79 @@ def test_async_get_event_returns_by_key_or_id_and_errors(tmp_path) -> None:
     assert by_id == {"ok": True, "event": engine.get_event(first["id"])}
     assert missing_lookup == {"ok": False, "error": "event_not_found", "lookup": "unknown"}
     assert missing_params == {"ok": False, "error": "missing_key_or_id"}
+
+
+def test_async_send_info_passes_image_url_to_notify_payload() -> None:
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    class _Coordinator:
+        async def async_request_refresh(self) -> None:
+            return None
+
+    handler = NotificationEngineServices(
+        _Hass(),
+        {
+            "people": {
+                "person.alice": {
+                    "notify_service": "notify.mobile_app_alice",
+                    "enabled": True,
+                }
+            }
+        },
+        NotificationEventEngine("/tmp/unused-events.json"),
+        _Coordinator(),
+    )
+
+    result = asyncio.run(
+        handler.async_send_info(
+            ServiceCall(
+                data={
+                    "title": "Info",
+                    "message": "Body",
+                    "image_url": "/local/info.jpg",
+                    "target": {"entity_id": "person.alice"},
+                }
+            )
+        )
+    )
+
+    assert result == {"ok": True, "sent": 1}
+    assert handler._hass.services.calls == [
+        (
+            "notify",
+            "mobile_app_alice",
+            {
+                "title": "Info",
+                "message": "Body",
+                "data": {
+                    "tag": "info_person.alice",
+                    "group": "info_person.alice",
+                    "image": "/local/info.jpg",
+                    "icon": "mdi:information",
+                },
+            },
+            True,
+        )
+    ]
 
 
 def test_notify_person_updates_timestamp_and_appends_history_for_resend(tmp_path) -> None:

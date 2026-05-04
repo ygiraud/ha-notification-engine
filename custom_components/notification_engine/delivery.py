@@ -180,6 +180,7 @@ async def send_to_notify(
     message: str,
     tag: str,
     actions: list[dict[str, Any]],
+    image_url: str = "",
     person_entity: str | None = None,
     strategy: str = "",
     timeout_seconds: int | None = None,
@@ -205,6 +206,8 @@ async def send_to_notify(
     if person_entity:
         payload["data"]["person_entity"] = person_entity
         payload["data"]["action_data"] = {"person_entity": person_entity}
+    if image_url:
+        payload["data"]["image"] = image_url
     if timeout_seconds is not None and timeout_seconds > 0:
         payload["data"]["timeout"] = timeout_seconds
     if strategy == "info":
@@ -353,6 +356,7 @@ async def process_events_core(hass: Any, domain_data: dict[str, Any]) -> dict[st
                     message=str(event.get("message", "")),
                     tag=str(event.get("tag", "")),
                     actions=list(event.get("mobile_actions", [])),
+                    image_url=str(event.get("image_url", "")),
                     person_entity=person,
                     strategy=strategy,
                     timeout_seconds=remaining_ttl_seconds,
