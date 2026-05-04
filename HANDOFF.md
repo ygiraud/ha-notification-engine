@@ -193,3 +193,40 @@ Avant d'envoyer a une personne : si `now < snoozed_until[person]`, skip. Apres e
 1. Utilisateur : tester la pre-release `v1.1.0-rc.1` sur instance HA
 2. Claude / Codex : traiter les bugs remontes pendant la periode de test
 3. Utilisateur : tagger `v1.1.0` et publier la release HACS une fois les tests concluants
+
+---
+
+## Analyse feature v1.2 — Image dans les notifications
+
+### Contexte
+
+L'app mobile HA supporte nativement un champ `image` dans le `data` du payload notify. Il peut être une URL HTTP/HTTPS publique ou un chemin `/local/` servi par HA (dossier `www/` de la config). Cette feature ajoute un champ optionnel `image_url` sur `create_event` et `send_info`.
+
+### Fichiers à modifier (4)
+
+**`event_engine.py`**
+- Ajouter `image_url: str = ""` à la signature de `make_event`
+- Persister `image_url` dans le dict retourné par `make_event`
+- Ajouter `image_url` dans la déduplication de `create_event` (comparer `event.get("image_url", "") == image_url`)
+- Dans `normalize_event` : passer le champ tel quel, pas de logique particulière
+
+**`delivery.py`**
+- Dans `send_to_notify` : ajouter un paramètre `image_url: str = ""`
+- Si `image_url` est non vide, injecter `payload["data"]["image"] = image_url` (la clé HA s'appelle `image`, pas `image_url`)
+- Dans `process_events_core` : passer `image_url=str(event.get("image_url", ""))` à l'appel `send_to_notify`
+
+**`services.py`**
+- Dans `async_create_event` : récupérer `str(call.data.get("image_url", ""))`, le passer à `engine.create_event`
+- Dans `async_send_info` : idem, passer directement à `send_to_notify`
+- Mettre à jour la signature de l'appel à `engine.create_event` (12 args → 13)
+
+**`services.yaml`**
+- Ajouter le champ `image_url` (optionnel, `selector: text:`) aux services `create_event` et `send_info`
+
+### Points d'attention
+
+- Le champ s'appelle `image` dans le payload HA mais `image_url` côté service pour être explicite (cohérent avec la convention du projet).
+- Ne pas valider le format de l'URL dans le moteur — laisser HA gérer les erreurs de fetch d'image.
+- Ajouter `image_url` dans les tests de déduplication de `test_event_engine.py`.
+- Le champ `image_url` n'est pas un critère de sélection de destinataires, il est juste pass-through.
+- Compatible avec toutes les strategies sans cas particulier.

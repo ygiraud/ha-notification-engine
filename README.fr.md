@@ -392,3 +392,4 @@ tests/
 ### v1.2.0
 
 - **Cibles notify alternatives** — support des services notify au-delà de `mobile_app_*` (Pushover, Telegram, etc.)
+- **Image dans les notifications** — champ optionnel `image_url` sur `create_event` et `send_info` pour joindre une image à la notification push
