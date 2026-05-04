@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 from typing import Any
@@ -148,17 +149,29 @@ def _register_dashboard_panel(hass: HomeAssistant) -> None:
 
     config = _dashboard_config()
     lovelace_data.dashboards[DASHBOARD_URL_PATH] = lovelace_dashboard.LovelaceYAML(hass, DASHBOARD_URL_PATH, config)
-    frontend.async_register_built_in_panel(
-        hass,
-        lovelace_domain,
-        frontend_url_path=DASHBOARD_URL_PATH,
-        require_admin=bool(config[LOVELACE_CONF_REQUIRE_ADMIN]),
-        show_in_sidebar=bool(config[LOVELACE_CONF_SHOW_IN_SIDEBAR]),
-        sidebar_title=str(config[LOVELACE_CONF_TITLE]),
-        sidebar_icon=str(config.get(LOVELACE_CONF_ICON, "")),
-        config={"mode": "yaml"},
-        update=True,
-    )
+    panel_kwargs: dict[str, Any] = {
+        "frontend_url_path": DASHBOARD_URL_PATH,
+        "require_admin": bool(config[LOVELACE_CONF_REQUIRE_ADMIN]),
+        "sidebar_title": str(config[LOVELACE_CONF_TITLE]),
+        "sidebar_icon": str(config.get(LOVELACE_CONF_ICON, "")),
+        "config": {"mode": "yaml"},
+        "update": True,
+    }
+
+    # Home Assistant changed the panel registration signature across releases.
+    # Keep the dashboard registration compatible by passing only supported args.
+    try:
+        panel_signature = inspect.signature(frontend.async_register_built_in_panel)
+    except (TypeError, ValueError):
+        panel_signature = None
+
+    show_in_sidebar = bool(config[LOVELACE_CONF_SHOW_IN_SIDEBAR])
+    if panel_signature and "show_in_sidebar" in panel_signature.parameters:
+        panel_kwargs["show_in_sidebar"] = show_in_sidebar
+    elif panel_signature and "sidebar_default_visible" in panel_signature.parameters:
+        panel_kwargs["sidebar_default_visible"] = show_in_sidebar
+
+    frontend.async_register_built_in_panel(hass, lovelace_domain, **panel_kwargs)
 
 
 @callback

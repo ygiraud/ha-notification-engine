@@ -3,14 +3,48 @@
 ## Last Agent
 
 - Name: Codex
-- Date: 2026-05-01 Europe/Paris (UTC+2)
-- Context: Finalisation v1.0.0 cote implementation. Test manquant ajoute pour `delete_event_by_key` et version bumpée a `1.0.0`.
+- Date: 2026-05-04 Europe/Paris (UTC+2)
+- Context: Correctif de compatibilite Home Assistant pour l'enregistrement du dashboard Lovelace.
 
 ---
 
 ## Objective
 
-Finaliser la v1.0.0 et preparer le commit/tag utilisateur.
+Corriger l'erreur `TypeError: async_register_built_in_panel() got an unexpected keyword argument 'show_in_sidebar'`.
+
+---
+
+## Completed Work
+
+- ✅ `custom_components/notification_engine/__init__.py` : enregistrement du panneau dashboard rendu compatible avec plusieurs signatures de `frontend.async_register_built_in_panel`
+- ✅ Detection runtime via `inspect.signature(...)`
+- ✅ Fallback sur `sidebar_default_visible` si `show_in_sidebar` n'est pas supporte
+- ✅ Verification syntaxique locale via `python3 -m py_compile custom_components/notification_engine/__init__.py`
+- ✅ Bump version `1.0.1` -> `1.0.2` dans `manifest.json`, `README.md` et `README.fr.md`
+
+---
+
+## Modified Files
+
+- `custom_components/notification_engine/__init__.py`
+- `custom_components/notification_engine/manifest.json`
+- `README.md`
+- `README.fr.md`
+- `HANDOFF.md`
+
+---
+
+## Decisions
+
+- Pas de refactor plus large du systeme dashboard: le correctif reste minimal et cible uniquement la rupture d'API Home Assistant.
+- Pas de test ajoute pour ce point: les tests du depot restent volontairement sans dependance Home Assistant, alors que `__init__.py` importe directement les modules HA.
+
+---
+
+## Open Questions / Risks
+
+- 🟡 Si une version Home Assistant tres ancienne ou atypique expose une signature differente sans `show_in_sidebar` ni `sidebar_default_visible`, l'appel retombera sur les arguments communs uniquement. C'est plus robuste que l'etat precedent, mais non verifie sur toutes les branches HA.
+- 🟡 Le correctif a ete verifie syntaxiquement, pas sur une instance Home Assistant reelle dans cet environnement.
 
 ---
 
