@@ -3,48 +3,54 @@
 ## Last Agent
 
 - Name: Codex
-- Date: 2026-05-04 Europe/Paris (UTC+2)
-- Context: Correctif de compatibilite Home Assistant pour l'enregistrement du dashboard Lovelace.
+- Date: 2026-05-05 Europe/Paris (UTC+2)
+- Context: Stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True`.
 
 ---
 
 ## Objective
 
-Corriger l'erreur `TypeError: async_register_built_in_panel() got an unexpected keyword argument 'show_in_sidebar'`.
+Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'entity_id historique `sensor.notifications_evenements`.
 
 ---
 
 ## Completed Work
 
-- ✅ `custom_components/notification_engine/__init__.py` : enregistrement du panneau dashboard rendu compatible avec plusieurs signatures de `frontend.async_register_built_in_panel`
-- ✅ Detection runtime via `inspect.signature(...)`
-- ✅ Fallback sur `sidebar_default_visible` si `show_in_sidebar` n'est pas supporte
-- ✅ Verification syntaxique locale via `python3 -m py_compile custom_components/notification_engine/__init__.py`
-- ✅ Bump version `1.0.1` -> `1.0.2` dans `manifest.json`, `README.md` et `README.fr.md`
+- ✅ `custom_components/notification_engine/__init__.py` : resolution du vrai `entity_id` du sensor via l'entity registry a partir du `unique_id`
+- ✅ Installation du dashboard YAML templatisee avec injection du `entity_id` reel du sensor d'evenements
+- ✅ Ordre de setup ajuste : plateformes chargees avant synchronisation du dashboard pour que le sensor existe deja au moment de la resolution
+- ✅ `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` : remplacement du hardcode `sensor.notifications_evenements` par un placeholder injecte a l'installation
+- ✅ Traductions du sensor raccourcies en `Events` / `Événements` pour rester coherentes avec `_attr_has_entity_name = True`
+- ✅ Verification syntaxique locale via `python3 -m py_compile custom_components/notification_engine/__init__.py custom_components/notification_engine/sensor.py`
+- ✅ Verification JSON locale via `json.loads(...)` sur `translations/en.json`, `translations/fr.json` et `strings.json`
 
 ---
 
 ## Modified Files
 
 - `custom_components/notification_engine/__init__.py`
-- `custom_components/notification_engine/manifest.json`
-- `README.md`
-- `README.fr.md`
+- `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml`
+- `custom_components/notification_engine/translations/en.json`
+- `custom_components/notification_engine/translations/fr.json`
 - `HANDOFF.md`
 
 ---
 
 ## Decisions
 
-- Pas de refactor plus large du systeme dashboard: le correctif reste minimal et cible uniquement la rupture d'API Home Assistant.
-- Pas de test ajoute pour ce point: les tests du depot restent volontairement sans dependance Home Assistant, alors que `__init__.py` importe directement les modules HA.
+- `has_entity_name = True` est conserve pour le sensor.
+- Le dashboard ne doit plus supposer un `entity_id` stable base sur le nom traduit.
+- Le point d'ancrage stable devient le `unique_id` du sensor: `notification_engine_notifications_evenements`.
+- Pas de refactor plus large du dashboard: correctif minimal par injection du `entity_id` au moment de la copie du YAML.
+- Pas de test ajoute pour ce point: la logique touche a Home Assistant (`entity_registry`, config entries, Lovelace) et n'est pas testable ici sans dependances HA.
 
 ---
 
 ## Open Questions / Risks
 
-- 🟡 Si une version Home Assistant tres ancienne ou atypique expose une signature differente sans `show_in_sidebar` ni `sidebar_default_visible`, l'appel retombera sur les arguments communs uniquement. C'est plus robuste que l'etat precedent, mais non verifie sur toutes les branches HA.
-- 🟡 Le correctif a ete verifie syntaxiquement, pas sur une instance Home Assistant reelle dans cet environnement.
+- 🟡 Sur une installation existante, l'entity registry peut conserver un ancien `entity_id` ou un slug different selon l'historique local. Le dashboard suivra ce `entity_id` reel apres reinstallation / resynchronisation, mais ce comportement n'a pas ete verifie sur instance HA reelle ici.
+- 🟡 Si la resolution par `unique_id` echoue au moment de l'installation du dashboard, fallback sur `sensor.notifications_evenements`. Ce fallback evite un fichier vide mais peut rester faux sur certaines installations atypiques.
+- 🟡 Le correctif a ete verifie syntaxiquement et structurellement, pas sur une instance Home Assistant reelle dans cet environnement.
 
 ---
 

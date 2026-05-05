@@ -43,6 +43,9 @@ DASHBOARD_SOURCE = "dashboards/notification_engine_dashboard.yaml"
 DASHBOARD_URL_PATH = "notification-engine"
 DASHBOARD_TITLE = "Notification Engine"
 DASHBOARD_ICON = "mdi:message-badge"
+DASHBOARD_EVENTS_SENSOR_PLACEHOLDER = "__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__"
+EVENTS_SENSOR_UNIQUE_ID = "notification_engine_notifications_evenements"
+FALLBACK_EVENTS_SENSOR_ENTITY_ID = "sensor.notifications_evenements"
 LOVELACE_CONF_FILENAME = "filename"
 LOVELACE_CONF_ICON = "icon"
 LOVELACE_CONF_MODE = "mode"
@@ -91,7 +94,23 @@ def _apply_runtime_config(domain_data: dict[str, Any], cfg: dict[str, Any]) -> N
     domain_data[CONF_INSTALL_DASHBOARD] = bool(cfg.get(CONF_INSTALL_DASHBOARD, DEFAULT_INSTALL_DASHBOARD))
 
 
-def _install_dashboard_file(hass: HomeAssistant) -> bool:
+def _resolve_events_sensor_entity_id(hass: HomeAssistant) -> str:
+    from homeassistant.helpers import entity_registry as er
+
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, EVENTS_SENSOR_UNIQUE_ID)
+    if entity_id:
+        return entity_id
+
+    _LOGGER.warning(
+        "Unable to resolve events sensor entity_id for unique_id '%s'; "
+        "falling back to %s",
+        EVENTS_SENSOR_UNIQUE_ID,
+        FALLBACK_EVENTS_SENSOR_ENTITY_ID,
+    )
+    return FALLBACK_EVENTS_SENSOR_ENTITY_ID
+
+
+def _install_dashboard_file(hass: HomeAssistant, events_sensor_entity_id: str) -> bool:
     source_path = Path(__file__).resolve().parent / DASHBOARD_SOURCE
     if not source_path.is_file():
         _LOGGER.warning("Dashboard template not found at %s", source_path)
@@ -100,7 +119,10 @@ def _install_dashboard_file(hass: HomeAssistant) -> bool:
     target_path = Path(hass.config.path("dashboards", DASHBOARD_FILENAME))
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    source_text = source_path.read_text(encoding="utf-8")
+    source_text = source_path.read_text(encoding="utf-8").replace(
+        DASHBOARD_EVENTS_SENSOR_PLACEHOLDER,
+        events_sensor_entity_id,
+    )
     if target_path.is_file():
         current_text = target_path.read_text(encoding="utf-8")
         if current_text == source_text:
@@ -197,7 +219,8 @@ async def _sync_dashboard(hass: HomeAssistant, cfg: dict[str, Any]) -> None:
         _unregister_dashboard_panel(hass)
         return
 
-    changed = await hass.async_add_executor_job(_install_dashboard_file, hass)
+    events_sensor_entity_id = _resolve_events_sensor_entity_id(hass)
+    changed = await hass.async_add_executor_job(_install_dashboard_file, hass, events_sensor_entity_id)
     if changed:
         _LOGGER.info("Notification Engine dashboard installed at %s", hass.config.path("dashboards", DASHBOARD_FILENAME))
     _register_dashboard_panel(hass)
@@ -253,8 +276,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     domain_data[entry.entry_id] = {}
     cfg = _entry_config(entry)
     _apply_runtime_config(domain_data, cfg)
-    await _sync_dashboard(hass, cfg)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _sync_dashboard(hass, cfg)
 
     async def _update_listener(hass: HomeAssistant, updated_entry: ConfigEntry) -> None:
         updated_cfg = _entry_config(updated_entry)

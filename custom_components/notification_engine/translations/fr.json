@@ -40,7 +40,7 @@
   "entity": {
     "sensor": {
       "events": {
-        "name": "Événements Notification Engine"
+        "name": "Événements"
       }
     }
   }

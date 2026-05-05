@@ -23,7 +23,7 @@ views:
                 filter:
                   template: >-
                     {% set events =
-                    state_attr('sensor.notifications_evenements', 'events') |
+                    state_attr('__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__', 'events') |
                     default([], true) %} {% set filtered = events |
                     selectattr('strategy', 'equalto', 'alert') | list %}
 
@@ -77,7 +77,7 @@ views:
                 filter:
                   template: >-
                     {% set events =
-                    state_attr('sensor.notifications_evenements', 'events') |
+                    state_attr('__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__', 'events') |
                     default([], true) %} {% set filtered = events |
                     selectattr('strategy', 'equalto', 'present') | list %}
 
@@ -130,7 +130,7 @@ views:
                 filter:
                   template: >-
                     {% set events =
-                    state_attr('sensor.notifications_evenements', 'events') |
+                    state_attr('__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__', 'events') |
                     default([], true) %} {% set filtered = events |
                     selectattr('strategy', 'equalto', 'asap') | list %}
 
@@ -184,7 +184,7 @@ views:
                 filter:
                   template: >-
                     {% set events =
-                    state_attr('sensor.notifications_evenements', 'events') |
+                    state_attr('__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__', 'events') |
                     default([], true) %} {% set filtered = events |
                     selectattr('strategy', 'equalto', 'away_reminder') | list %}
 
@@ -240,7 +240,7 @@ views:
               columns: full
             visibility:
               - condition: numeric_state
-                entity: sensor.notifications_evenements
+                entity: __NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__
                 above: 0
       - type: grid
         cards:
