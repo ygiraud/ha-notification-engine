@@ -4,13 +4,13 @@
 
 - Name: Codex
 - Date: 2026-05-05 Europe/Paris (UTC+2)
-- Context: Stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True`.
+- Context: Stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True`, puis ajout des consignes `graphify` dans la documentation agent.
 
 ---
 
 ## Objective
 
-Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'entity_id historique `sensor.notifications_evenements`.
+Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'entity_id historique `sensor.notifications_evenements`, puis formaliser l'usage de `graphify` pour les prochains agents.
 
 ---
 
@@ -23,6 +23,8 @@ Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'en
 - ✅ Traductions du sensor raccourcies en `Events` / `Événements` pour rester coherentes avec `_attr_has_entity_name = True`
 - ✅ Verification syntaxique locale via `python3 -m py_compile custom_components/notification_engine/__init__.py custom_components/notification_engine/sensor.py`
 - ✅ Verification JSON locale via `json.loads(...)` sur `translations/en.json`, `translations/fr.json` et `strings.json`
+- ✅ Graphe `graphify` genere pour le depot (`graphify-out/graph.html`, `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`)
+- ✅ `AGENTS.md` complete avec des regles d'usage et de mise a jour de `graphify`
 
 ---
 
@@ -32,6 +34,7 @@ Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'en
 - `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml`
 - `custom_components/notification_engine/translations/en.json`
 - `custom_components/notification_engine/translations/fr.json`
+- `AGENTS.md`
 - `HANDOFF.md`
 
 ---
@@ -43,6 +46,8 @@ Eviter que le dashboard casse quand le sensor des evenements n'utilise plus l'en
 - Le point d'ancrage stable devient le `unique_id` du sensor: `notification_engine_notifications_evenements`.
 - Pas de refactor plus large du dashboard: correctif minimal par injection du `entity_id` au moment de la copie du YAML.
 - Pas de test ajoute pour ce point: la logique touche a Home Assistant (`entity_registry`, config entries, Lovelace) et n'est pas testable ici sans dependances HA.
+- `graphify` devient l'outil recommande pour l'analyse transversale du depot.
+- Le graphe doit etre mis a jour apres des changements significatifs d'architecture, de services, de dashboard, de config flow ou de documentation reliee.
 
 ---
 

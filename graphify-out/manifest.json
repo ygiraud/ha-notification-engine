@@ -1,0 +1,70 @@
+{
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/tests/test_event_engine.py": {
+    "mtime": 1777900120.0057595,
+    "hash": "6b12be0bc81f5bfe2acd4e1a93d806e2"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/delivery.py": {
+    "mtime": 1777900120.003505,
+    "hash": "0b70ecff8b710c257aaa1e08133aba88"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/services.py": {
+    "mtime": 1777900120.0049686,
+    "hash": "d53cc75e7dc793ec4d845858f2f32aa9"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/sensor.py": {
+    "mtime": 1777616322.6946948,
+    "hash": "33a391a98dca4f99beb9571f414bfc97"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/__init__.py": {
+    "mtime": 1777971071.2793071,
+    "hash": "11013f9bbf072c97ffa4170ba1b9032f"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/event_engine.py": {
+    "mtime": 1777900120.0042288,
+    "hash": "559d739b3ac3a1bbb5a9d3ab0b314452"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/text.py": {
+    "mtime": 1777122217.429996,
+    "hash": "ef0d293780a858aa85d7f29b532ca01c"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/const.py": {
+    "mtime": 1777900120.003116,
+    "hash": "a35204fa86947b1b3fda59462dafcbbd"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/config_flow.py": {
+    "mtime": 1777122185.7219875,
+    "hash": "e93b579044fb67be7d2fc24fc7c60fdb"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/README.fr.md": {
+    "mtime": 1777900120.001556,
+    "hash": "c99a7410c0177f4916a1fcfb91cf8162"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/README.md": {
+    "mtime": 1777900120.0020635,
+    "hash": "eb3ce99b4208d1ee333f1477d5f9fc45"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/AGENTS.md": {
+    "mtime": 1777900120.000437,
+    "hash": "89e81392408c5dd4817f1f0c000222a7"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/HANDOFF.md": {
+    "mtime": 1777971103.9018924,
+    "hash": "88c5eb5a071ca61be2f1f7dd21ff0f30"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/services.yaml": {
+    "mtime": 1777900120.0052583,
+    "hash": "85f4ade300a631073d148ec335ad4062"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml": {
+    "mtime": 1777971071.326609,
+    "hash": "5c1c3c62cc7714f8825523caea96f04c"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/brand/icon.png": {
+    "mtime": 1777144890.4121606,
+    "hash": "fdf8d74d790f6ffc6aa6e62649482808"
+  },
+  "/Users/ygiraud/dev/github/ygiraud/ha-notification-engine/custom_components/notification_engine/brand/logo.png": {
+    "mtime": 1777144902.6780045,
+    "hash": "b27d3e4ce41d5e648ee5796b874b7062"
+  }
+}

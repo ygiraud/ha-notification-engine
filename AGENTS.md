@@ -54,6 +54,22 @@
   - Re-scan README examples for personal identifiers.
   - Ensure no runtime/local files are committed.
 
+### Graphify
+
+- `graphify` is the repository map for architecture, cross-file relationships, and codebase exploration.
+- Use `graphify` before non-trivial analysis when the task requires understanding interactions across multiple files, services, dashboards, docs, tests, or branding assets.
+- Use `graphify query`, `graphify path`, or `graphify explain` when a graph already exists and the question is exploratory.
+- Build or rebuild the graph with `/graphify .` when:
+  - the graph does not exist yet
+  - the repository structure changed significantly
+  - docs, dashboards, or assets were added and cross-file context matters
+- Refresh the graph with `/graphify . --update` after meaningful changes to tracked files when the graph is expected to stay usable for the next agent.
+- Code-only small edits do not require a full rebuild if the graph is not needed for the current task.
+- `graphify-out/` is a working artifact directory:
+  - do not treat it as source of truth over the code
+  - do not commit it unless the user explicitly asks
+  - use it to accelerate understanding, not to replace direct code verification
+
 ---
 
 ## Mandatory Rules (immutable)
@@ -100,6 +116,7 @@
 - Understand the context and intent of the code.
 - Identify risks, edge cases, and possible side effects.
 - If something looks wrong or risky, call it out before proceeding.
+- If the task spans several files or touches unclear architecture, check whether the existing `graphify-out/graph.json` is usable before starting blind exploration.
 
 ### During Work
 
@@ -113,6 +130,7 @@
 - Review your own changes critically.
 - Check for unintended side effects.
 - Ensure consistency and readability.
+- If the change materially alters architecture, service surface, dashboard wiring, config flow, or documentation relationships, update the graph with `/graphify . --update` when practical.
 
 ---
 
