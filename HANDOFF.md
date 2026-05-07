@@ -3,8 +3,8 @@
 ## Last Agent
 
 - Name: Codex
-- Date: 2026-05-05 Europe/Paris (UTC+2)
-- Context: Features v1.1 #1 a #5 validees, arbitrage de l'architecture temporelle (polling 1 minute + design snooze), puis stabilisation du dashboard Lovelace apres migration du sensor vers `has_entity_name = True` et ajout des consignes `graphify` dans la documentation agent.
+- Date: 2026-05-07 Europe/Paris (UTC+2)
+- Context: Diagnostic CI `hassfest` sur `main` apres release v1.1.0. Cause probable identifiee: `graphify-out/manifest.json` versionne et confondu avec un vrai manifest HA. Correctif applique en ignorant `graphify-out/` et en le retirant de l'index Git.
 
 ---
 
@@ -38,6 +38,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - ✅ Verification JSON locale via `json.loads(...)` sur `translations/en.json`, `translations/fr.json` et `strings.json`
 - ✅ Graphe `graphify` genere pour le depot (`graphify-out/graph.html`, `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`)
 - ✅ `AGENTS.md` complete avec des regles d'usage et de mise a jour de `graphify`
+- ✅ Correctif CI `hassfest`: `graphify-out/` ajoute au `.gitignore` et retire de l'index Git pour eviter qu'un faux `manifest.json` soit pris en compte
 
 ---
 
@@ -53,6 +54,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - `custom_components/notification_engine/translations/en.json`
 - `custom_components/notification_engine/translations/fr.json`
 - `tests/test_event_engine.py`
+- `.gitignore`
 - `AGENTS.md`
 - `HANDOFF.md`
 
@@ -88,6 +90,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - Pas de refactor plus large du dashboard: correctif minimal par injection du `entity_id` au moment de la copie du YAML.
 - Pas de test ajoute pour le correctif dashboard: la logique touche a Home Assistant (`entity_registry`, config entries, Lovelace) et n'est pas testable ici sans dependances HA.
 - `graphify` devient l'outil recommande pour l'analyse transversale du depot.
+- `graphify-out/` doit rester un artefact local non versionne. Son `manifest.json` n'est pas un manifest Home Assistant valide et peut casser `hassfest`.
 - Le graphe doit etre mis a jour apres des changements significatifs d'architecture, de services, de dashboard, de config flow ou de documentation reliee.
 - v1.1 inclut le `snooze` (deplace depuis v1.2).
 - v1.2 : uniquement les cibles notify alternatives (Pushover, Telegram, etc.).
@@ -103,6 +106,7 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 - 🟡 Sur une installation existante, l'entity registry peut conserver un ancien `entity_id` ou un slug different selon l'historique local. Le dashboard suivra ce `entity_id` reel apres reinstallation / resynchronisation, mais ce comportement n'a pas ete verifie sur instance HA reelle ici.
 - 🟡 Si la resolution par `unique_id` echoue au moment de l'installation du dashboard, fallback sur `sensor.notifications_evenements`. Ce fallback evite un fichier vide mais peut rester faux sur certaines installations atypiques.
 - 🟡 Le correctif dashboard a ete verifie syntaxiquement et structurellement, pas sur une instance Home Assistant reelle dans cet environnement.
+- 🟡 Le diagnostic `hassfest` repose sur l'hypothese que l'action scanne le faux `graphify-out/manifest.json`. Le correctif est coherent avec la panne observee, mais doit etre confirme par un nouveau run GitHub Actions.
 
 ---
 
