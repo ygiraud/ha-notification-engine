@@ -389,17 +389,39 @@ class NotificationEngineServices:
         )
 
     async def async_on_state_changed(self, event: Event) -> None:
-        """Trigger event processing when a tracked person arrives home."""
+        """React to tracked person arrivals and departures."""
         entity_id = str(event.data.get("entity_id", ""))
         if not entity_id.startswith("person."):
             return
-        people = set(people_config(self._domain_data).keys())
+        people = people_config(self._domain_data)
         if entity_id not in people:
             return
         new_state = event.data.get("new_state")
         old_state = event.data.get("old_state")
-        if new_state is None or new_state.state != "home":
+        new_is_home = new_state is not None and new_state.state == "home"
+        old_is_home = old_state is not None and old_state.state == "home"
+
+        if new_is_home and not old_is_home:
+            await process_events_core(self._hass, self._domain_data)
             return
-        if old_state is not None and old_state.state == "home":
+
+        if not old_is_home or new_is_home:
             return
-        await process_events_core(self._hass, self._domain_data)
+
+        events = await self._hass.async_add_executor_job(self._engine.load_events)
+        for ev in events:
+            if ev.get("status") != "pending":
+                continue
+            if str(ev.get("strategy", "")) != "present":
+                continue
+            if entity_id not in ev.get("notified_people", []):
+                continue
+            updated = await self._hass.async_add_executor_job(
+                self._engine.unnotify_person, str(ev.get("id", "")), entity_id
+            )
+            if updated is None:
+                continue
+            await clear_tag_for_person(
+                self._hass, people, entity_id, str(updated.get("tag", ev.get("tag", "")))
+            )
+        await self._coordinator.async_request_refresh()

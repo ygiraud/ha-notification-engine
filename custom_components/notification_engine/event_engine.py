@@ -416,6 +416,30 @@ class NotificationEventEngine:
             return event
         return None
 
+    def unnotify_person(self, event_id: str, person: str) -> dict[str, Any] | None:
+        """Remove a person from notified tracking so they can be notified again."""
+        events = self.load_events()
+        for event in events:
+            if event.get("id") != event_id:
+                continue
+            now = utc_now_iso()
+            notified = event.setdefault("notified_people", [])
+            if isinstance(notified, list):
+                event["notified_people"] = [item for item in notified if str(item) != person]
+            else:
+                event["notified_people"] = []
+            notified_at = normalize_notified_at(event.get("notified_at"))
+            notified_at.pop(person, None)
+            event["notified_at"] = notified_at
+            snoozed_until = normalize_snoozed_until(event.get("snoozed_until"))
+            snoozed_until.pop(person, None)
+            event["snoozed_until"] = snoozed_until
+            event["updated_at"] = now
+            event.setdefault("history", []).append({"at": now, "action": "unnotified", "person": person})
+            self.save_events(events)
+            return event
+        return None
+
     def snooze_event(
         self,
         tag: str,

@@ -4,62 +4,59 @@
 
 - Name: Codex
 - Date: 2026-05-07 Europe/Paris (UTC+2)
-- Context: Rebase de `v1.2.0` sur `main`, avec conservation du correctif CI `hassfest` sur `graphify-out/` et integration de la feature v1.2 `image_url` jusqu'au payload mobile HA.
+- Context: Implémentation de la feature v1.2 "reset on departure" pour la stratégie `present`.
 
 ---
 
 ## Objective
 
-Continue v1.2 work on top of `main` while preserving the completed v1.1 baseline and recent CI hygiene fixes.
+Finaliser la feature "reset de notification au départ" pour la stratégie `present` : quand une personne quitte le domicile sans avoir traité l'event (ex. machine à laver), on efface la notif de son téléphone et on réinitialise son état "notifié" afin qu'elle soit re-notifiée à son prochain retour.
 
 ---
 
 ## Completed Work
 
-- ✅ v1.1 est integree et stable sur la branche de base
-- ✅ Correctif CI `hassfest`: `graphify-out/` ignore dans Git et retire de l'index
+- ✅ v1.1 stable sur `main`
+- ✅ Correctif CI `hassfest` : `graphify-out/` ignoré dans Git
 - ✅ Feature v1.2 `image_url` implementee sur `create_event` et `send_info`
 - ✅ `custom_components/notification_engine/event_engine.py` : persistance de `image_url` et prise en compte dans la deduplication
-- ✅ `custom_components/notification_engine/delivery.py` : mapping de `image_url` vers `data.image` dans le payload mobile Home Assistant
+- ✅ `custom_components/notification_engine/delivery.py` : mapping de `image_url` vers `data.image` dans le payload mobile HA
 - ✅ `custom_components/notification_engine/services.py` : propagation de `image_url` depuis les services `create_event` et `send_info`
 - ✅ `custom_components/notification_engine/services.yaml` : documentation du champ `image_url`
 - ✅ `tests/test_event_engine.py` : tests pour persistance/deduplication, injection dans le payload mobile et chemin `send_info`
-- ✅ Validation locale de la feature `image_url` executee avec succes lors de son implementation:
-- `python3 -m py_compile custom_components/notification_engine/*.py tests/test_event_engine.py`
-- `pytest tests/test_event_engine.py` -> `36 passed`
-
----
-
-## Modified Files
-
-- `custom_components/notification_engine/event_engine.py`
-- `custom_components/notification_engine/delivery.py`
-- `custom_components/notification_engine/services.py`
-- `custom_components/notification_engine/services.yaml`
-- `custom_components/notification_engine/manifest.json`
-- `tests/test_event_engine.py`
-- `.gitignore`
-- `HANDOFF.md`
+- ✅ `custom_components/notification_engine/event_engine.py` : ajout de `unnotify_person()` pour nettoyer `notified_people`, `notified_at` et `snoozed_until`
+- ✅ `custom_components/notification_engine/services.py` : `async_on_state_changed()` gère maintenant les départs pour les events `present` en attente
+- ✅ `tests/test_event_engine.py` : 5 nouveaux tests couvrent `unnotify_person()` et le cycle arrivée -> départ -> retour
+- ✅ Validation locale : `python3 -m py_compile custom_components/notification_engine/*.py tests/test_event_engine.py`
+- ✅ Validation locale : `pytest tests/test_event_engine.py` -> `41 passed`
 
 ---
 
 ## Decisions
 
 - Contrat de reponse JSON `{"ok": true/false, ...}` : IMMUABLE.
-- `graphify-out/` reste un artefact local non versionne. Son `manifest.json` n'est pas un manifest Home Assistant valide et peut casser `hassfest`.
-- `image_url` est optionnel sur `create_event` et `send_info`.
-- `image_url` est stocke tel quel dans l'evenement.
-- Le payload Home Assistant utilise la cle `data.image`, pas `image_url`.
-- La deduplication de `create_event` doit tenir compte de `image_url`.
-- La branche `v1.2.0` conserve une version de manifest `1.2.0-pre` pendant le developpement.
+- `graphify-out/` reste un artefact local non versionne.
+- Le reset au départ s'applique **uniquement** à la strategy `present`.
+- `unnotify_person` doit aussi nettoyer `snoozed_until` (cohérence avec `notify_person` qui le fait dans l'autre sens).
+- `people` dans `async_on_state_changed` doit être le dict complet retourné par `people_config()`, pas un `set` de clés.
+- Aucun changement de surface de service n'est nécessaire pour cette feature.
+
+---
+
+## Modified Files
+
+- `custom_components/notification_engine/event_engine.py`
+- `custom_components/notification_engine/services.py`
+- `tests/test_event_engine.py`
+- `HANDOFF.md`
 
 ---
 
 ## Open Questions / Risks
 
 - 🟡 Le correctif `hassfest` doit encore etre confirme par un nouveau run GitHub Actions.
-- 🟡 Le support `image_url` repose sur le comportement natif des notifications mobiles Home Assistant. Aucun test device reel n'a ete execute ici.
-- 🟡 La suite fonctionnelle de v1.2 apres `image_url` reste a prioriser.
+- 🟡 Le support `image_url` repose sur le comportement natif des notifications mobiles HA. Aucun test device reel n'a ete execute.
+- 🟡 Le comportement "clear_notification" reste dépendant des integrations `mobile_app_*` ciblees. Il n'y a pas eu de validation device reelle sur ce reset.
 
 ---
 
@@ -75,14 +72,13 @@ Continue v1.2 work on top of `main` while preserving the completed v1.1 baseline
 
 ### v1.2 - In progress
 
-- ✅ `image_url` sur `create_event`
-- ✅ `image_url` sur `send_info`
-- 🟡 Suite v1.2 a definir
+- ✅ `image_url` sur `create_event` et `send_info`
+- ✅ **Reset on departure** — priorité 1
+- 🔲 **Alternative notify targets** — priorité 2 (support de services notify au-delà de `mobile_app_*` : Pushover, Telegram, etc.) — spécifié dans `README.md`, non encore conçu
 
 ---
 
 ## Next Steps
 
-1. Verifier que le rebase de `v1.2.0` sur `main` est propre et termine
-2. Relancer la CI, en particulier `hassfest`
-3. Prioriser la prochaine feature v1.2 apres `image_url`
+1. Concevoir la feature "Alternative notify targets" en vérifiant d'abord l'impact sur `delivery.py`, `services.py`, `README.md` et les tests
+2. Valider le correctif `hassfest` et les tests via CI GitHub Actions
