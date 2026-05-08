@@ -261,11 +261,11 @@ views:
                 card_param: cards
                 filter:
                   template: >-
-                    {% set raw = states('text.notification_engine_test_targets')
-                    %} {% set selected = raw.split(',') | map('trim') |
-                    reject('equalto', '') | list %} {% set ns =
-                    namespace(cards=[]) %} {% for p in states.person |
-                    sort(attribute='name') %}
+                    {% set raw = states('text.notification_engine_test_targets') %}
+                    {% set configured = state_attr('__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__', 'configured_people') | default([], true) %}
+                    {% set selected = raw.split(',') | map('trim') | select('match', '^person\\.') | select('in', configured) | unique | list %}
+                    {% set ns = namespace(cards=[]) %}
+                    {% for p in expand(configured) | sort(attribute='name') %}
                       {% set eid = p.entity_id %}
                       {% set active = eid in selected %}
                       {% if active %}
@@ -335,7 +335,12 @@ views:
                         entity_id: |-
                           [[[
                             const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            const configured =
+                              states['__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__']?.attributes?.configured_people || [];
+                            return raw
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s.startsWith('person.') && configured.includes(s));
                           ]]]
                       data:
                         key: test_dashboard_notifications
@@ -360,7 +365,12 @@ views:
                         entity_id: |-
                           [[[
                             const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            const configured =
+                              states['__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__']?.attributes?.configured_people || [];
+                            return raw
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s.startsWith('person.') && configured.includes(s));
                           ]]]
                       data:
                         key: test_dashboard_notifications
@@ -385,7 +395,12 @@ views:
                         entity_id: |-
                           [[[
                             const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            const configured =
+                              states['__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__']?.attributes?.configured_people || [];
+                            return raw
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s.startsWith('person.') && configured.includes(s));
                           ]]]
                       data:
                         key: test_dashboard_notifications
@@ -410,7 +425,12 @@ views:
                         entity_id: |-
                           [[[
                             const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            const configured =
+                              states['__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__']?.attributes?.configured_people || [];
+                            return raw
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s.startsWith('person.') && configured.includes(s));
                           ]]]
                       data:
                         key: test_dashboard_notifications
@@ -435,7 +455,12 @@ views:
                         entity_id: |-
                           [[[
                             const raw = states['text.notification_engine_test_targets']?.state || '';
-                            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+                            const configured =
+                              states['__NOTIFICATION_ENGINE_EVENTS_SENSOR_ENTITY_ID__']?.attributes?.configured_people || [];
+                            return raw
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s.startsWith('person.') && configured.includes(s));
                           ]]]
                       data:
                         key: test_dashboard_notifications

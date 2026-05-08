@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import CONF_PEOPLE, DOMAIN
 
 
 class NotificationEventsSensor(CoordinatorEntity, SensorEntity):
@@ -20,6 +20,15 @@ class NotificationEventsSensor(CoordinatorEntity, SensorEntity):
     _attr_translation_key = "events"
     _attr_unique_id = "notification_engine_notifications_evenements"
     _attr_icon = "mdi:message-badge"
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        domain_data: dict[str, Any],
+    ) -> None:
+        """Initialise the sensor with runtime config access."""
+        super().__init__(coordinator)
+        self._domain_data = domain_data
 
     @property
     def native_value(self) -> int:
@@ -31,7 +40,13 @@ class NotificationEventsSensor(CoordinatorEntity, SensorEntity):
         events = self.coordinator.data or []
         if not isinstance(events, list):
             events = []
-        return {"events": events}
+        configured_people = self._domain_data.get(CONF_PEOPLE, {})
+        if not isinstance(configured_people, dict):
+            configured_people = {}
+        return {
+            "events": events,
+            "configured_people": list(configured_people.keys()),
+        }
 
 
 async def async_setup_entry(
@@ -44,4 +59,7 @@ async def async_setup_entry(
     coordinator: DataUpdateCoordinator | None = domain_data.get("coordinator")
     if coordinator is None:
         return
-    async_add_entities([NotificationEventsSensor(coordinator)], update_before_add=True)
+    async_add_entities(
+        [NotificationEventsSensor(coordinator, domain_data)],
+        update_before_add=True,
+    )
