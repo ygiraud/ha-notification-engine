@@ -8,7 +8,7 @@
 [![HACS Validation](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=HACS+Validation)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![Hassfest](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=Hassfest)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 🇬🇧 [English version](README.md)
@@ -381,7 +381,7 @@ tests/
 
 ## 🗺 Roadmap
 
-### v1.1.0 ✅
+### v1.1.1 ✅
 
 - **TTL des événements** — champ optionnel `ttl_hours` sur `create_event` ; les événements expirés sont supprimés automatiquement lors du `process_events`
 - **Re-notification** — renvoi d'un événement `asap` non acquitté après un délai configurable
