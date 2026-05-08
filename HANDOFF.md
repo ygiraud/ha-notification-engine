@@ -3,8 +3,8 @@
 ## Last Agent
 
 - Name: Codex
-- Date: 2026-05-07 Europe/Paris (UTC+2)
-- Context: Diagnostic CI `hassfest` sur `main` apres release v1.1.0. Cause probable identifiee: `graphify-out/manifest.json` versionne et confondu avec un vrai manifest HA. Correctif applique en ignorant `graphify-out/` et en le retirant de l'index Git.
+- Date: 2026-05-08 Europe/Paris (UTC+2)
+- Context: Correctif dashboard suite a un bug utilisateur sur la selection de cibles de test. Le helper `text.notification_engine_test_targets` pouvait contenir des valeurs parasites restaurees par HA (ex: `Test`), puis le dashboard les reinjectait telles quelles dans `target.entity_id`.
 
 ---
 
@@ -16,6 +16,12 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 
 ## Completed Work
 
+- ✅ Le dashboard de test n'affiche plus toutes les entites `person`, seulement celles configurees dans le module
+- ✅ `custom_components/notification_engine/sensor.py` expose maintenant `configured_people` dans les attributs du sensor d'evenements
+- ✅ `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` filtre l'affichage et les cibles de test sur `configured_people`
+- ✅ Dashboard de test durci contre les valeurs invalides dans `text.notification_engine_test_targets`
+- ✅ `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml` : la selection des personnes ignore desormais toute entree qui ne commence pas par `person.`
+- ✅ Boutons de test `create_event` : `target.entity_id` filtre desormais les valeurs non `person.*` avant appel du service
 - ✅ Feature v1.1 #1 (TTL) terminee et validee sur instance HA
 - ✅ Feature v1.1 #2 (Re-notification) terminee et testee sur instance HA
 - ✅ Feature v1.1 #3 (`purge_events` filters) terminee
@@ -44,6 +50,9 @@ Implement v1.1 features one by one, each tied to a GitHub issue closed via commi
 
 ## Modified Files
 
+- `custom_components/notification_engine/dashboards/notification_engine_dashboard.yaml`
+- `custom_components/notification_engine/sensor.py`
+- `HANDOFF.md`
 - `custom_components/notification_engine/__init__.py`
 - `custom_components/notification_engine/const.py`
 - `custom_components/notification_engine/delivery.py`
