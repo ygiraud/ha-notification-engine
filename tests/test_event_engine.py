@@ -282,6 +282,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
             message="Immediate action required",
             tag="alert-tag",
             actions=[],
+            image_url="/local/alert.jpg",
             strategy="alert",
             timeout_seconds=45,
         )
@@ -304,6 +305,7 @@ def test_send_to_notify_adds_critical_mobile_payload_only_for_alert_strategy() -
 
     assert alert_payload["data"]["ttl"] == 0
     assert alert_payload["data"]["timeout"] == 45
+    assert alert_payload["data"]["image"] == "/local/alert.jpg"
     assert alert_payload["data"]["priority"] == "high"
     assert alert_payload["data"]["channel"] == "alarm_stream"
     assert alert_payload["data"]["push"] == {
@@ -371,6 +373,34 @@ def test_create_event_stores_ttl_hours_and_deduplicates_on_it(tmp_path) -> None:
     distinct = engine.create_event(key="door", title="Door", message="Open", ttl_hours=3)
 
     assert first["event"]["ttl_hours"] == 2.0
+    assert duplicate["created"] is False
+    assert distinct["created"] is True
+    assert len(engine.load_events()) == 2
+
+
+def test_create_event_stores_image_url_and_deduplicates_on_it(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    first = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-open.jpg",
+    )
+    duplicate = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-open.jpg",
+    )
+    distinct = engine.create_event(
+        key="door",
+        title="Door",
+        message="Open",
+        image_url="/local/door-closed.jpg",
+    )
+
+    assert first["event"]["image_url"] == "/local/door-open.jpg"
     assert duplicate["created"] is False
     assert distinct["created"] is True
     assert len(engine.load_events()) == 2
@@ -483,6 +513,79 @@ def test_async_get_event_returns_by_key_or_id_and_errors(tmp_path) -> None:
     assert by_id == {"ok": True, "event": engine.get_event(first["id"])}
     assert missing_lookup == {"ok": False, "error": "event_not_found", "lookup": "unknown"}
     assert missing_params == {"ok": False, "error": "missing_key_or_id"}
+
+
+def test_async_send_info_passes_image_url_to_notify_payload() -> None:
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    class _Coordinator:
+        async def async_request_refresh(self) -> None:
+            return None
+
+    handler = NotificationEngineServices(
+        _Hass(),
+        {
+            "people": {
+                "person.alice": {
+                    "notify_service": "notify.mobile_app_alice",
+                    "enabled": True,
+                }
+            }
+        },
+        NotificationEventEngine("/tmp/unused-events.json"),
+        _Coordinator(),
+    )
+
+    result = asyncio.run(
+        handler.async_send_info(
+            ServiceCall(
+                data={
+                    "title": "Info",
+                    "message": "Body",
+                    "image_url": "/local/info.jpg",
+                    "target": {"entity_id": "person.alice"},
+                }
+            )
+        )
+    )
+
+    assert result == {"ok": True, "sent": 1}
+    assert handler._hass.services.calls == [
+        (
+            "notify",
+            "mobile_app_alice",
+            {
+                "title": "Info",
+                "message": "Body",
+                "data": {
+                    "tag": "info_person.alice",
+                    "group": "info_person.alice",
+                    "image": "/local/info.jpg",
+                    "icon": "mdi:information",
+                },
+            },
+            True,
+        )
+    ]
 
 
 def test_notify_person_updates_timestamp_and_appends_history_for_resend(tmp_path) -> None:
@@ -838,6 +941,43 @@ def test_snooze_event_sets_deadline_and_notify_person_clears_it(tmp_path) -> Non
     assert "person.alice" not in after_notify["snoozed_until"]
 
 
+def test_unnotify_person_resets_all_tracking_fields(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(key="door", title="Door", message="Open")["event"]
+
+    engine.notify_person(created["id"], "person.alice")
+    removed = engine.unnotify_person(created["id"], "person.alice")
+
+    assert removed is not None
+    stored = engine.load_events()[0]
+    assert "person.alice" not in stored["notified_people"]
+    assert "person.alice" not in stored["notified_at"]
+    assert "person.alice" not in stored["snoozed_until"]
+    assert any(
+        item.get("action") == "unnotified" and item.get("person") == "person.alice"
+        for item in stored["history"]
+    )
+
+
+def test_unnotify_person_clears_snooze_as_well(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(key="door", title="Door", message="Open")["event"]
+    now = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+
+    engine.notify_person(created["id"], "person.alice")
+    engine.snooze_event(created["tag"], "person.alice", 30, now=now)
+    engine.unnotify_person(created["id"], "person.alice")
+
+    stored = engine.load_events()[0]
+    assert stored["snoozed_until"] == {}
+
+
+def test_unnotify_person_returns_none_for_unknown_event(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+
+    assert engine.unnotify_person("nonexistent_id", "person.yoan") is None
+
+
 def test_process_events_core_renotifies_unacknowledged_asap_after_delay(tmp_path) -> None:
     engine = NotificationEventEngine(str(tmp_path / "events.json"))
     created = engine.create_event(
@@ -1078,6 +1218,196 @@ def test_async_on_mobile_action_snoozes_for_acting_person(tmp_path) -> None:
             True,
         )
     ]
+
+
+def test_async_on_state_changed_resets_notified_on_departure(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="laundry",
+        strategy="present",
+        title="Laundry",
+        message="Machine done",
+        recipients=["person.alice"],
+    )["event"]
+
+    class _State:
+        def __init__(self, state: str) -> None:
+            self.state = state
+
+    class _Coordinator:
+        def __init__(self) -> None:
+            self.refresh_calls = 0
+
+        async def async_request_refresh(self) -> None:
+            self.refresh_calls += 1
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _States:
+        def __init__(self) -> None:
+            self.values = {"person.alice": _State("not_home")}
+
+        def get(self, entity_id: str):
+            return self.values.get(entity_id)
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+            self.states = _States()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    coordinator = _Coordinator()
+    hass = _Hass()
+    handler = NotificationEngineServices(
+        hass,
+        {
+            "engine": engine,
+            "people": {
+                "person.alice": {
+                    "notify_service": "notify.mobile_app_alice",
+                    "enabled": True,
+                }
+            },
+        },
+        engine,
+        coordinator,
+    )
+
+    arrival_event = Event()
+    arrival_event.data = {
+        "entity_id": "person.alice",
+        "old_state": _State("not_home"),
+        "new_state": _State("home"),
+    }
+
+    hass.states.values["person.alice"] = _State("home")
+    asyncio.run(handler.async_on_state_changed(arrival_event))
+
+    after_arrival = engine.load_events()[0]
+    assert after_arrival["notified_people"] == ["person.alice"]
+    assert len(hass.services.calls) == 1
+
+    departure_event = Event()
+    departure_event.data = {
+        "entity_id": "person.alice",
+        "old_state": _State("home"),
+        "new_state": _State("not_home"),
+    }
+
+    hass.states.values["person.alice"] = _State("not_home")
+    asyncio.run(handler.async_on_state_changed(departure_event))
+
+    after_departure = engine.load_events()[0]
+    assert after_departure["notified_people"] == []
+    assert "person.alice" not in after_departure["notified_at"]
+    assert len(hass.services.calls) == 2
+    assert hass.services.calls[1] == (
+        "notify",
+        "mobile_app_alice",
+        {"message": "clear_notification", "data": {"tag": created["tag"]}},
+        True,
+    )
+    assert coordinator.refresh_calls >= 1
+
+    second_arrival_event = Event()
+    second_arrival_event.data = {
+        "entity_id": "person.alice",
+        "old_state": _State("not_home"),
+        "new_state": _State("home"),
+    }
+
+    hass.states.values["person.alice"] = _State("home")
+    asyncio.run(handler.async_on_state_changed(second_arrival_event))
+
+    after_second_arrival = engine.load_events()[0]
+    assert after_second_arrival["notified_people"] == ["person.alice"]
+    assert len(hass.services.calls) == 3
+
+
+def test_async_on_state_changed_departure_does_not_affect_non_present_events(tmp_path) -> None:
+    engine = NotificationEventEngine(str(tmp_path / "events.json"))
+    created = engine.create_event(
+        key="alarm",
+        strategy="alert",
+        title="Alarm",
+        message="Still pending",
+        recipients=["person.alice"],
+    )["event"]
+    engine.notify_person(created["id"], "person.alice")
+
+    class _State:
+        def __init__(self, state: str) -> None:
+            self.state = state
+
+    class _Coordinator:
+        def __init__(self) -> None:
+            self.refresh_calls = 0
+
+        async def async_request_refresh(self) -> None:
+            self.refresh_calls += 1
+
+    class _Services:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def async_call(
+            self,
+            domain: str,
+            service: str,
+            payload: dict[str, object],
+            *,
+            blocking: bool,
+        ) -> None:
+            self.calls.append((domain, service, payload, blocking))
+
+    class _Hass:
+        def __init__(self) -> None:
+            self.services = _Services()
+
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    handler = NotificationEngineServices(
+        _Hass(),
+        {
+            "engine": engine,
+            "people": {
+                "person.alice": {
+                    "notify_service": "notify.mobile_app_alice",
+                    "enabled": True,
+                }
+            },
+        },
+        engine,
+        _Coordinator(),
+    )
+
+    departure_event = Event()
+    departure_event.data = {
+        "entity_id": "person.alice",
+        "old_state": _State("home"),
+        "new_state": _State("not_home"),
+    }
+
+    asyncio.run(handler.async_on_state_changed(departure_event))
+
+    stored = engine.load_events()[0]
+    assert stored["notified_people"] == ["person.alice"]
+    assert handler._hass.services.calls == []
 
 
 def test_process_events_core_renotifies_alert_after_delay(tmp_path) -> None:

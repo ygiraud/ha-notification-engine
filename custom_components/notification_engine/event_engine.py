@@ -196,6 +196,7 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(resolved_recipients, list):
         resolved_recipients = []
     normalized["resolved_recipients"] = [str(person) for person in resolved_recipients if str(person)]
+    normalized["image_url"] = str(normalized.get("image_url", ""))
     normalized["ttl_hours"] = normalize_ttl_hours(normalized.get("ttl_hours"))
     normalized["renotify_minutes"] = normalize_renotify_minutes(normalized.get("renotify_minutes"))
     normalized["notified_at"] = normalize_notified_at(normalized.get("notified_at"))
@@ -212,6 +213,7 @@ def make_event(
     strategy: str = "",
     title: str = "",
     message: str = "",
+    image_url: str = "",
     actions: list[dict[str, str]] | None = None,
     ttl_hours: float | None = None,
     renotify_minutes: float | None = None,
@@ -227,6 +229,7 @@ def make_event(
             "status": "pending",
             "title": title,
             "message": message,
+            "image_url": image_url,
             "tag": build_tag(event_id),
             "created_at": now,
             "updated_at": now,
@@ -305,6 +308,7 @@ class NotificationEventEngine:
         strategy: str = "",
         title: str = "",
         message: str = "",
+        image_url: str = "",
         actions: list[dict[str, str]] | None = None,
         ttl_hours: float | None = None,
         renotify_minutes: float | None = None,
@@ -326,6 +330,7 @@ class NotificationEventEngine:
                 and event.get("strategy", "") == strategy
                 and event.get("title", "") == title
                 and event.get("message", "") == message
+                and event.get("image_url", "") == image_url
                 and event.get("actions", []) == action_list
                 and event.get("ttl_hours") == normalized_ttl_hours
                 and event.get("renotify_minutes") == normalized_renotify_minutes
@@ -341,6 +346,7 @@ class NotificationEventEngine:
             strategy=strategy,
             title=title,
             message=message,
+            image_url=image_url,
             actions=action_list,
             ttl_hours=normalized_ttl_hours,
             renotify_minutes=normalized_renotify_minutes,
@@ -406,6 +412,30 @@ class NotificationEventEngine:
             event["snoozed_until"] = snoozed_until
             event["updated_at"] = now
             event.setdefault("history", []).append({"at": now, "action": "notified", "person": person})
+            self.save_events(events)
+            return event
+        return None
+
+    def unnotify_person(self, event_id: str, person: str) -> dict[str, Any] | None:
+        """Remove a person from notified tracking so they can be notified again."""
+        events = self.load_events()
+        for event in events:
+            if event.get("id") != event_id:
+                continue
+            now = utc_now_iso()
+            notified = event.setdefault("notified_people", [])
+            if isinstance(notified, list):
+                event["notified_people"] = [item for item in notified if str(item) != person]
+            else:
+                event["notified_people"] = []
+            notified_at = normalize_notified_at(event.get("notified_at"))
+            notified_at.pop(person, None)
+            event["notified_at"] = notified_at
+            snoozed_until = normalize_snoozed_until(event.get("snoozed_until"))
+            snoozed_until.pop(person, None)
+            event["snoozed_until"] = snoozed_until
+            event["updated_at"] = now
+            event.setdefault("history", []).append({"at": now, "action": "unnotified", "person": person})
             self.save_events(events)
             return event
         return None

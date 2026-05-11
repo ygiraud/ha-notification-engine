@@ -8,7 +8,7 @@
 [![HACS Validation](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=HACS+Validation)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![Hassfest](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml/badge.svg?job=Hassfest)](https://github.com/ygiraud/ha-notification-engine/actions/workflows/ci.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0--rc.1-orange.svg)](https://github.com/ygiraud/ha-notification-engine/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 🇫🇷 [Version française](README.fr.md)
@@ -302,6 +302,116 @@ If the event is still pending after 6 hours, it is removed automatically the nex
 
 ---
 
+### Handle custom notification button actions
+
+Custom mobile actions are re-emitted by the integration as a Home Assistant event:
+`notification_engine_custom_action`
+
+Useful event fields:
+- `id` - Notification Engine event id
+- `action` - custom action string from the button
+- `tag` - mobile notification tag
+
+Example automation:
+
+```yaml
+alias: Notification Engine - custom actions
+description: Centralize custom Notification Engine button actions.
+triggers:
+  - trigger: event
+    event_type: notification_engine_custom_action
+conditions:
+  - alias: Valid Notification Engine event
+    condition: template
+    value_template: >-
+      {{
+        trigger.event.data is defined
+        and trigger.event.data.id is defined
+        and trigger.event.data.action is defined
+      }}
+actions:
+  - alias: Initialize context
+    variables:
+      action_done: false
+      context: ""
+      event_id: "{{ trigger.event.data.id | default('') }}"
+      notification_action: "{{ trigger.event.data.action | default('') }}"
+      light_entity: >-
+        {% if notification_action.startswith('LIGHT_OFF|') %}
+          {{ notification_action.split('|')[1] }}
+        {% else %}
+          {{ '' }}
+        {% endif %}
+  - alias: Business logic
+    choose:
+      - alias: Turn off a light
+        conditions:
+          - condition: template
+            value_template: "{{ notification_action.startswith('LIGHT_OFF|') }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: "{{ light_entity }}"
+          - action: notification_engine.delete_event
+            data:
+              id: "{{ event_id }}"
+          - variables:
+              action_done: true
+              context: "💡 Light turned off from a notification"
+      - alias: Washing machine emptied
+        conditions:
+          - condition: template
+            value_template: "{{ notification_action == 'WASHING_MACHINE_EMPTY' }}"
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.washing_machine
+            data:
+              option: "off"
+          - action: notification_engine.delete_event
+            data:
+              id: "{{ event_id }}"
+          - variables:
+              action_done: true
+              context: "🧺 Washing machine reset to off from a notification"
+      - alias: Dishwasher emptied
+        conditions:
+          - condition: template
+            value_template: "{{ notification_action == 'DISHWASHER_EMPTY' }}"
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.dishwasher
+            data:
+              option: "off"
+          - action: notification_engine.delete_event
+            data:
+              id: "{{ event_id }}"
+          - variables:
+              action_done: true
+              context: "🍽️ Dishwasher reset to off from a notification"
+      - alias: Dryer emptied
+        conditions:
+          - condition: template
+            value_template: "{{ notification_action == 'DRYER_EMPTY' }}"
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.dryer
+            data:
+              option: "off"
+          - action: notification_engine.delete_event
+            data:
+              id: "{{ event_id }}"
+          - variables:
+              action_done: true
+              context: "👕 Dryer reset to off from a notification"
+mode: parallel
+max: 10
+```
+
+---
+
 ## 📊 Lovelace Dashboard
 
 A pre-built dashboard is included and can be installed directly from the integration options.
@@ -381,7 +491,7 @@ tests/
 
 ## 🗺 Roadmap
 
-### v1.1.1 ✅
+### v1.1.0 ✅
 
 - **Event TTL** — optional `ttl_hours` field on `create_event`; expired events are automatically removed during `process_events`
 - **Re-notification** — resend an unacknowledged `asap` event after a configurable delay
@@ -391,5 +501,4 @@ tests/
 
 ### v1.2.0
 
-- **Alternative notify targets** — support notify services beyond `mobile_app_*` (Pushover, Telegram, etc.)
 - **Image in notifications** — optional `image_url` field on `create_event` and `send_info` to attach an image to the push notification

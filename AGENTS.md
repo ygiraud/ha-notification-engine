@@ -14,6 +14,8 @@
   - `config_flow.py`
   - `const.py`
   - `event_engine.py`
+  - `delivery.py`
+  - `services.py`
   - `sensor.py`
   - `text.py`
   - `services.yaml`
@@ -233,28 +235,28 @@ Closes #N
 
 ---
 
-## v1.1 Features
+## Features
 
 Work is done feature by feature. Each feature maps to a GitHub issue.
 Implement one feature per working session. Close the issue in the commit message with `Closes #N`.
 
+### v1.1 — Complete
+
 | # | Feature | GitHub Issue | Status |
 |---|---|---|---|
 | 1 | Event TTL (`ttl_hours` on `create_event`, auto-purge on `process_events`) | #1 | completed |
-| 2 | Re-notification (resend unacknowledged `asap` after configurable delay) | #2 | pending |
-| 3 | `purge_events` filters (`strategy`, `status`, `older_than_hours`) | #3 | pending |
-| 4 | `get_event` service (retrieve single event by `key` or `id`) | #4 | pending |
-| 5 | `snooze` action (defer event N minutes from mobile notification) | #5 | pending |
+| 2 | Re-notification (resend unacknowledged `asap` after configurable delay) | #2 | completed |
+| 3 | `purge_events` filters (`strategy`, `status`, `older_than_hours`) | #3 | completed |
+| 4 | `get_event` service (retrieve single event by `key` or `id`) | #4 | completed |
+| 5 | `snooze` action (defer event N minutes from mobile notification) | #5 | completed |
 
-### Implementation Order
+### v1.2 — In progress
 
-Implement in issue number order. Each feature is independent enough to be done in isolation.
-
-1. Event TTL (#1) — adds `ttl_hours` field + auto-purge in `process_events`
-2. Re-notification (#2) — new scheduling logic for unacknowledged `asap` events
-3. `purge_events` filters (#3) — extends existing service with filter params
-4. `get_event` service (#4) — pure read-only service, no side effects
-5. `snooze` action (#5) — mobile action handler, defers event N minutes (precision ensured by 1-min polling)
+| # | Feature | GitHub Issue | Status |
+|---|---|---|---|
+| 6 | `image_url` on `create_event` and `send_info` | - | completed |
+| 7 | Reset on departure (`present` strategy: unnotify + clear on leave) | - | pending (priorité 1) |
+| 8 | Alternative notify targets (Pushover, Telegram, etc.) | - | pending (priorité 2) |
 
 ### Per-Feature Checklist
 
