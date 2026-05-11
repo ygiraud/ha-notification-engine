@@ -61,10 +61,10 @@ Finaliser la feature "reset de notification au départ" pour la stratégie `pres
 
 ## Open Questions / Risks
 
-- 🟡 Le correctif `hassfest` doit encore etre confirme par un nouveau run GitHub Actions.
-- 🟡 Le support `image_url` repose sur le comportement natif des notifications mobiles HA. Aucun test device reel n'a ete execute.
-- 🟡 Le comportement "clear_notification" reste dependant des integrations `mobile_app_*` ciblees. Il n'y a pas eu de validation device reelle sur ce reset.
-- 🟡 Le dashboard filtre maintenant sur `configured_people`. Si la config change et que le sensor ne se refresh pas immediatement, l'affichage peut attendre le prochain refresh/coordinator.
+- ✅ Le correctif `hassfest` confirme par CI GitHub Actions.
+- ✅ `image_url` valide sur device reel — l'image apparait correctement dans la notification push.
+- ✅ `clear_notification` valide sur device reel — la notif disparait bien au depart.
+- ✅ Dashboard / coordinator : risque accepte. En pratique, tout changement de config entraine un reload de la config entry qui recrée le sensor.
 
 ---
 
@@ -79,16 +79,15 @@ Finaliser la feature "reset de notification au départ" pour la stratégie `pres
 - ✅ `snooze`
 - ✅ Correctif dashboard sur la selection des cibles de test
 
-### v1.2 - In progress
+### v1.2 - Pret pour release
 
 - ✅ `image_url` sur `create_event` et `send_info`
-- ✅ Reset on departure - priorite 1
-- 🔲 Alternative notify targets - priorite 2 (support de services notify au-dela de `mobile_app_*` : Pushover, Telegram, etc.) - specifie dans `README.md`, non encore conçu
+- ✅ Reset on departure
+- ✅ Correctif dashboard (filtrage `configured_people`, boutons de test)
+- ✅ Validation CI + device
 
 ---
 
 ## Next Steps
 
-1. Concevoir la feature "Alternative notify targets" en verifiant d'abord l'impact sur `delivery.py`, `services.py`, `README.md` et les tests
-2. Valider le correctif `hassfest` et les tests via CI GitHub Actions
-3. Si necessaire, declencher un refresh explicite du coordinator apres changement de config pour que `configured_people` se mette a jour immediatement dans le dashboard
+1. Taguer `v1.2.0` sur la branche `v1.2.0-pre` et merger dans `main`

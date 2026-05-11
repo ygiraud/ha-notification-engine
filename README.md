@@ -501,5 +501,4 @@ tests/
 
 ### v1.2.0
 
-- **Alternative notify targets** — support notify services beyond `mobile_app_*` (Pushover, Telegram, etc.)
 - **Image in notifications** — optional `image_url` field on `create_event` and `send_info` to attach an image to the push notification
